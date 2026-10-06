@@ -3,6 +3,10 @@ with Abacus_Cholesky_Tests;
 with Abacus_Elementary_Tests;
 with Abacus_Matrices_Tests;
 with Abacus_Ieee_Tests;
+with Abacus_Qp_Admm_Tests;
+with Abacus_Qp_Certificate_Tests;
+with Abacus_Qp_Engine_Tests;
+with Abacus_Qp_Tests;
 with Abacus_Quantities_Tests;
 with Abacus_Sorting_Tests;
 with Abacus_Stats_Rolling_Tests;
@@ -28,6 +32,10 @@ package body Abacus_Suite is
    Roll   : aliased Abacus_Stats_Rolling_Tests.Test;
    Matr   : aliased Abacus_Matrices_Tests.Test;
    Chol   : aliased Abacus_Cholesky_Tests.Test;
+   Qp     : aliased Abacus_Qp_Tests.Test;
+   Admm   : aliased Abacus_Qp_Admm_Tests.Test;
+   Cert   : aliased Abacus_Qp_Certificate_Tests.Test;
+   Engine : aliased Abacus_Qp_Engine_Tests.Test;
 
    function Suite return Access_Test_Suite is
    begin
@@ -43,6 +51,10 @@ package body Abacus_Suite is
       Add_Test (Result'Access, Roll'Access);
       Add_Test (Result'Access, Matr'Access);
       Add_Test (Result'Access, Chol'Access);
+      Add_Test (Result'Access, Qp'Access);
+      Add_Test (Result'Access, Admm'Access);
+      Add_Test (Result'Access, Cert'Access);
+      Add_Test (Result'Access, Engine'Access);
       return Result'Access;
    end Suite;
 

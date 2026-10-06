@@ -7,6 +7,7 @@ with Abacus_Steps.Arithmetic;
 with Abacus_Steps.Cholesky;
 with Abacus_Steps.Elementary;
 with Abacus_Steps.Ieee;
+with Abacus_Steps.Qp;
 with Abacus_Steps.Stats;
 with Abacus_Steps.Text;
 
@@ -157,6 +158,7 @@ package body Abacus_Steps is
    Elementary_Name : aliased constant String := "elementary";
    Stats_Name      : aliased constant String := "stats";
    Cholesky_Name   : aliased constant String := "cholesky";
+   Qp_Name         : aliased constant String := "qp";
 
    --!format off
    Regions : constant array (Positive range <>) of Region :=
@@ -171,7 +173,8 @@ package body Abacus_Steps is
       (Stats_Name'Access, Stats.Offer'Access,
        Stats.Reset'Access, Stats.Phase'Access),
       (Cholesky_Name'Access, Cholesky.Offer'Access,
-       Cholesky.Reset'Access, Cholesky.Phase'Access)];
+       Cholesky.Reset'Access, Cholesky.Phase'Access),
+      (Qp_Name'Access, Qp.Offer'Access, Qp.Reset'Access, Qp.Phase'Access)];
    --!format on
 
    --  Every region's state, for the step no region would take.

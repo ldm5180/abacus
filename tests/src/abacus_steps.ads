@@ -6,6 +6,7 @@ with Fabula.Registry;
 with Abacus;
 with Abacus.Arith;
 with Abacus.Ieee;
+with Abacus.Qp;
 with Abacus.Text;
 
 --  The step registry the feature runner dispatches on: one Step_Kind
@@ -68,7 +69,26 @@ package Abacus_Steps is
       E_Check_Solution,
       --  An event no pattern names: a factorization posts it, and the
       --  next row's guard reads whether it factored.
-      E_Factor_Settled);
+      E_Factor_Settled,
+      E_Pose_Identity,
+      E_Pose_Linear,
+      E_Pose_Diagonal,
+      E_Bound_All,
+      E_Bound_Upper,
+      E_Open_Upper,
+      E_Give_Objective,
+      E_Sum_Exactly,
+      E_Sum_At_Most,
+      E_Solve_Qp,
+      E_Solve_Warm,
+      --  An event no pattern names: a solve posts it, and the next row's
+      --  guard reads whether it was certified.
+      E_Qp_Settled,
+      E_Check_Certified,
+      E_Check_Outcome,
+      E_Check_Each,
+      E_Check_Variable,
+      E_Check_Fewer);
 
    type Hook_Kind is (Fresh_World);
 
@@ -157,6 +177,35 @@ package Abacus_Steps is
       Solution : Abacus.Vector (1 .. Max_Side) := [others => 0];
    end record;
 
+   --  The largest problem qp.feature poses.
+   Max_Variables : constant := 8;
+
+   subtype Variable_Count is Natural range 0 .. Max_Variables;
+
+   subtype Small_Vector is Abacus.Vector (1 .. Max_Variables);
+
+   --  The problem qp.feature poses -- its matrix, objective, box and its
+   --  one row over every variable -- and the last solve's outcome,
+   --  answer and iterations, with the cold-start iterations beside a
+   --  warm start's.
+   type Program is record
+      N          : Variable_Count := 0;
+      P          : Abacus.Matrix (1 .. Max_Variables, 1 .. Max_Variables) :=
+        [others => [others => 0]];
+      Q          : Small_Vector := [others => 0];
+      Lo         : Small_Vector := [others => 0];
+      Hi         : Small_Vector := [others => 0];
+      Has_Row    : Boolean := False;
+      Row_Lo     : Abacus.Val := 0;
+      Row_Hi     : Abacus.Val := 0;
+      Result     : Abacus.Qp.Outcome := Abacus.Qp.Exhausted;
+      X, Z, Y    : Small_Vector := [others => 0];
+      Z_Row      : Abacus.Val := 0;
+      Y_Row      : Abacus.Val := 0;
+      Iterations : Natural := 0;
+      Cold       : Natural := 0;
+   end record;
+
    --  What one scenario holds.  fabula copies it per step, so it holds
    --  values only.
    type World is record
@@ -166,6 +215,7 @@ package Abacus_Steps is
       Elem  : Function_Result;
       Stats : Table;
       Chol  : Factoring;
+      Qp    : Program;
    end record;
 
    --  One step as a machine sees it: the scenario, the step's arguments,
@@ -287,11 +337,11 @@ package Abacus_Steps is
       Step ("the data {}")                   >= E_Give_Data,
       Step ("the {word} quantile is taken by the {word} rule")
                                              >= E_Take_Quantile,
-      Step ("the answer is {word}")          >= E_Check_Answer,
+      Step ("the statistic is {word}")       >= E_Check_Answer,
       Step ("the weights {}")                >= E_Give_Weights,
       Step ("the second series {}")          >= E_Give_Second,
       Step ("the {} is computed")            >= E_Compute,
-      Step ("the answer is within {word} of {word}")
+      Step ("the statistic is within {word} of {word}")
                                              >= E_Check_Near,
       Step ("a window over {int} series")    >= E_Open_Window,
       Step ("the rows {}")                   >= E_Give_Rows,
@@ -314,7 +364,34 @@ package Abacus_Steps is
       Step ("the factorization is refused at column {int}")
                                              >= E_Check_Refused_At,
       Step ("the solution is within {word} of {}")
-                                             >= E_Check_Solution];
+                                             >= E_Check_Solution,
+      Step ("a problem in {int} variables with the identity as its matrix")
+                                             >= E_Pose_Identity,
+      Step ("a problem in {int} variables with no quadratic term")
+                                             >= E_Pose_Linear,
+      Step ("a problem in {int} variables with the diagonal {} as its matrix")
+                                             >= E_Pose_Diagonal,
+      Step ("both variables between {word} and {word}")
+                                             >= E_Bound_All,
+      Step ("every variable between {word} and {word}")
+                                             >= E_Bound_All,
+      Step ("variable {int} at most {word}") >= E_Bound_Upper,
+      Step ("variable {int} with no upper bound")
+                                             >= E_Open_Upper,
+      Step ("the linear objective {}")       >= E_Give_Objective,
+      Step ("the variables summing to exactly {word}")
+                                             >= E_Sum_Exactly,
+      Step ("the variables summing to at most {word}")
+                                             >= E_Sum_At_Most,
+      Step ("it is solved")                  >= E_Solve_Qp,
+      Step ("it is solved again from that answer with the linear objective {}")
+                                             >= E_Solve_Warm,
+      Step ("the answer is certified")       >= E_Check_Certified,
+      Step ("the outcome is {}")             >= E_Check_Outcome,
+      Step ("each variable is {word}")       >= E_Check_Each,
+      Step ("variable {int} is {word}")      >= E_Check_Variable,
+      Step ("it took fewer iterations than a cold start does")
+                                             >= E_Check_Fewer];
    --!format on
 
    Hook_Defs : constant Steps.Hook_Table := [Before >= Fresh_World];
