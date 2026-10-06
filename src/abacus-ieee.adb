@@ -57,30 +57,6 @@ is
    Max_Up   : constant := 34;
    Max_Down : constant := 60;
 
-   --  2**K, bounded by its element subtype so the prover sees the bound.
-   subtype Power_Of_Two is Wide range 1 .. 2**Max_Down;
-
-   subtype Shift_Count is Natural range 0 .. Max_Down;
-
-   --  Written out: the provers bound 2**K for a variable K only so far.
-   --!format off
-   Powers : constant array (Shift_Count) of Power_Of_Two :=
-     [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1_024, 2_048, 4_096, 8_192,
-      16_384, 32_768, 65_536, 131_072, 262_144, 524_288, 1_048_576,
-      2_097_152, 4_194_304, 8_388_608, 16_777_216, 33_554_432, 67_108_864,
-      134_217_728, 268_435_456, 536_870_912, 1_073_741_824, 2_147_483_648,
-      4_294_967_296, 8_589_934_592, 17_179_869_184, 34_359_738_368,
-      68_719_476_736, 137_438_953_472, 274_877_906_944, 549_755_813_888,
-      1_099_511_627_776, 2_199_023_255_552, 4_398_046_511_104,
-      8_796_093_022_208, 17_592_186_044_416, 35_184_372_088_832,
-      70_368_744_177_664, 140_737_488_355_328, 281_474_976_710_656,
-      562_949_953_421_312, 1_125_899_906_842_624, 2_251_799_813_685_248,
-      4_503_599_627_370_496, 9_007_199_254_740_992, 18_014_398_509_481_984,
-      36_028_797_018_963_968, 72_057_594_037_927_936,
-      144_115_188_075_855_872, 288_230_376_151_711_744,
-      576_460_752_303_423_488, 1_152_921_504_606_846_976];
-   --!format on
-
    function Refusal (O : Outcome) return Read
    is ((Outcome => O, Value => 0));
 
@@ -94,9 +70,9 @@ is
       if Power > Max_Up then
          return Refusal (Out_Of_Range);
       elsif Power >= 0 then
-         Units := S * Powers (Power);
+         Units := S * Arith.Powers_Of_Two (Power);
       elsif Power >= -Max_Down then
-         Units := Arith.Div_Round (S, Powers (-Power));
+         Units := Arith.Div_Round (S, Arith.Powers_Of_Two (-Power));
       end if;
       if Units > Val_Bound then
          return Refusal (Out_Of_Range);

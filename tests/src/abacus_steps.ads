@@ -39,7 +39,11 @@ package Abacus_Steps is
       E_Bits_Settled,
       E_Check_Bits_Units,
       E_Check_Bits_Ratio,
-      E_Check_Bits_Refused);
+      E_Check_Bits_Refused,
+      E_Apply,
+      E_Apply_Again,
+      E_Check_Square,
+      E_Check_Within);
 
    type Hook_Kind is (Fresh_World);
 
@@ -67,12 +71,18 @@ package Abacus_Steps is
       Got : Abacus.Ieee.Read;
    end record;
 
+   --  The last result elementary.feature took.
+   type Function_Result is record
+      Value : Abacus.Val := 0;
+   end record;
+
    --  What one scenario holds.  fabula copies it per step, so it holds
    --  values only.
    type World is record
       Arith : Sums;
       Text  : Reading;
       Bits  : Pattern;
+      Elem  : Function_Result;
    end record;
 
    --  One step as a machine sees it: the scenario, the step's arguments,
@@ -98,6 +108,18 @@ package Abacus_Steps is
 
    --  Fail the step for capture N: why it does not read as units.
    procedure Refuse_Units (Ctx : in out Step_Context; N : Positive := 1);
+
+   --  Whether capture N reads as decimal text (Abacus.Text).
+   function Decimal_Read
+     (Ctx : Step_Context; N : Positive := 1) return Boolean;
+
+   --  Capture N as a value, which Decimal_Read said reads.
+   function Decimal_Of
+     (Ctx : Step_Context; N : Positive := 1) return Abacus.Val
+   with Pre => Decimal_Read (Ctx, N);
+
+   --  Fail the step for capture N: why it is not decimal text.
+   procedure Refuse_Decimal (Ctx : in out Step_Context; N : Positive := 1);
 
    --  Whether capture N reads as a whole number a value holds.
    function Whole_Read (Ctx : Step_Context; N : Positive := 1) return Boolean;
@@ -156,7 +178,14 @@ package Abacus_Steps is
       Step ("the bits read as {int} units")  >= E_Check_Bits_Units,
       Step ("the bits read as {int} over {int}")
                                              >= E_Check_Bits_Ratio,
-      Step ("the bits are refused as {}")    >= E_Check_Bits_Refused];
+      Step ("the bits are refused as {}")    >= E_Check_Bits_Refused,
+      Step ("the {word} of the result is taken")
+                                             >= E_Apply_Again,
+      Step ("the {word} of {word} is taken") >= E_Apply,
+      Step ("its square is {word} within {int} units")
+                                             >= E_Check_Square,
+      Step ("the result is {word} within {word}")
+                                             >= E_Check_Within];
    --!format on
 
    Hook_Defs : constant Steps.Hook_Table := [Before >= Fresh_World];

@@ -3,6 +3,7 @@ with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Fabula.Numbers;
 
 with Abacus_Steps.Arithmetic;
+with Abacus_Steps.Elementary;
 with Abacus_Steps.Ieee;
 with Abacus_Steps.Text;
 
@@ -35,6 +36,26 @@ package body Abacus_Steps is
          & " is not a whole number of units: "
          & Fabula.Numbers.Reason (Error));
    end Refuse_Units;
+
+   function Decimal_Read (Ctx : Step_Context; N : Positive := 1) return Boolean
+   is (N <= Fabula.Args.Count (Ctx.A)
+       and then Abacus.Text.Parse (Fabula.Args.Word (Ctx.A, N)).Ok);
+
+   function Decimal_Of
+     (Ctx : Step_Context; N : Positive := 1) return Abacus.Val
+   is (Abacus.Text.Parse (Fabula.Args.Word (Ctx.A, N)).Value);
+
+   procedure Refuse_Decimal (Ctx : in out Step_Context; N : Positive := 1) is
+   begin
+      Fabula.Check.Fail_Step
+        (Ctx.R,
+         "capture"
+         & N'Image
+         & " is not a decimal number: "
+         & (if N <= Fabula.Args.Count (Ctx.A)
+            then Abacus.Text.Parse (Fabula.Args.Word (Ctx.A, N)).Error'Image
+            else "missing"));
+   end Refuse_Decimal;
 
    --  The largest whole number a value holds.
    Whole_Bound : constant := Abacus.Val_Bound / Abacus.One;
@@ -98,6 +119,7 @@ package body Abacus_Steps is
    Arithmetic_Name : aliased constant String := "arithmetic";
    Text_Name       : aliased constant String := "text";
    Ieee_Name       : aliased constant String := "ieee";
+   Elementary_Name : aliased constant String := "elementary";
 
    --!format off
    Regions : constant array (Positive range <>) of Region :=
@@ -106,7 +128,9 @@ package body Abacus_Steps is
       (Text_Name'Access, Text.Offer'Access,
        Text.Reset'Access, Text.Phase'Access),
       (Ieee_Name'Access, Ieee.Offer'Access,
-       Ieee.Reset'Access, Ieee.Phase'Access)];
+       Ieee.Reset'Access, Ieee.Phase'Access),
+      (Elementary_Name'Access, Elementary.Offer'Access,
+       Elementary.Reset'Access, Elementary.Phase'Access)];
    --!format on
 
    --  Every region's state, for the step no region would take.

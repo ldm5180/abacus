@@ -17,6 +17,34 @@ is
    Divisor_Bound : constant := 2**96;
    subtype Divisor is Wide range 1 .. Divisor_Bound;
 
+   --  2**K for a shift, bounded by its element subtype so a product with
+   --  it has a bound the prover can see.  Written out: the provers bound
+   --  2**K for a variable K only so far.
+   Widest_Shift : constant := 64;
+
+   subtype Shift_Count is Natural range 0 .. Widest_Shift;
+   subtype Power_Of_Two is Wide range 1 .. 2**Widest_Shift;
+
+   --!format off
+   Powers_Of_Two : constant array (Shift_Count) of Power_Of_Two :=
+     [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1_024, 2_048, 4_096, 8_192,
+      16_384, 32_768, 65_536, 131_072, 262_144, 524_288, 1_048_576,
+      2_097_152, 4_194_304, 8_388_608, 16_777_216, 33_554_432, 67_108_864,
+      134_217_728, 268_435_456, 536_870_912, 1_073_741_824, 2_147_483_648,
+      4_294_967_296, 8_589_934_592, 17_179_869_184, 34_359_738_368,
+      68_719_476_736, 137_438_953_472, 274_877_906_944, 549_755_813_888,
+      1_099_511_627_776, 2_199_023_255_552, 4_398_046_511_104,
+      8_796_093_022_208, 17_592_186_044_416, 35_184_372_088_832,
+      70_368_744_177_664, 140_737_488_355_328, 281_474_976_710_656,
+      562_949_953_421_312, 1_125_899_906_842_624, 2_251_799_813_685_248,
+      4_503_599_627_370_496, 9_007_199_254_740_992, 18_014_398_509_481_984,
+      36_028_797_018_963_968, 72_057_594_037_927_936,
+      144_115_188_075_855_872, 288_230_376_151_711_744,
+      576_460_752_303_423_488, 1_152_921_504_606_846_976,
+      2_305_843_009_213_693_952, 4_611_686_018_427_387_904,
+      9_223_372_036_854_775_808, 18_446_744_073_709_551_616];
+   --!format on
+
    --  N / D rounded to nearest, ties away from zero: the one rounding
    --  every operation here takes.
    function Div_Round (N : Product; D : Divisor) return Wide
