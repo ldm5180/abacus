@@ -1,0 +1,17 @@
+name = "abacus_spike"
+description = "The abacus S0 spike: fixed-point linear algebra and a QP, measured"
+version = "0.0.0"
+
+authors = ["Lenny Maiorani"]
+maintainers = ["Lenny Maiorani <639247+ldm5180@users.noreply.github.com>"]
+maintainers-logins = ["ldm5180"]
+licenses = "MIT"
+
+project-files = ["spike.gpr"]
+
+#  AUnit is for spike/tests only; spike.gpr withs nothing.
+[[depends-on]]
+aunit = "^26.0.0"
+
+[build-switches]
+"*".ada_version = "Ada2022"

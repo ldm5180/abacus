@@ -1,0 +1,18 @@
+with "../spike.gpr";
+
+--  The spike's benchmark: times each kernel and the whole bucket at each
+--  Frac and prints one line per measurement.  Only MODE=release and
+--  MODE=unchecked are measurements; debug is a sanity run.
+project Bench is
+
+   for Source_Dirs use ("src");
+   for Object_Dir use "obj/" & Spike.Mode;
+   for Exec_Dir use "bin/" & Spike.Mode;
+   for Create_Missing_Dirs use "True";
+   for Main use ("bench_spike.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use Spike.Compiler'Default_Switches ("Ada");
+   end Compiler;
+
+end Bench;

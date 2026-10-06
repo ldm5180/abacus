@@ -1,0 +1,36 @@
+abacus spike bucket (written by spike/tools/make_bucket.py)
+seed 20261006, 250 days, 180 assets, blocks 1..90 and 91..180
+problem: minimize (1/2) w'(20 S + 1e-06 I) w - mu'w, 0 <= w <= 1, each block sums to 0.1
+S: sample covariance, divisor n - 1; mu: sample mean
+median correlation: within 0.7345, between -0.3142
+returns: mean 0.00151, std 0.05339, min -0.3525, max 0.1300
+
+Frac 32:
+  OSQP: solved, 325 iterations, polish status 1, objective -1.274900019939e-03
+  Clarabel: Solved
+  max |OSQP - Clarabel| = 1.182e-12
+  max |OSQP - KKT on active set| = 5.759e-16; 3 free; KKT signs and box hold: True; least lower-bound multiplier 7.543e-05
+  oracle weights (OSQP), nonzero:
+    w[83] = 0.100000000000
+    w[104] = 0.028289966795
+    w[126] = 0.071710033205
+
+Frac 40:
+  OSQP: solved, 325 iterations, polish status 1, objective -1.274900019586e-03
+  Clarabel: Solved
+  max |OSQP - Clarabel| = 1.183e-12
+  max |OSQP - KKT on active set| = 4.545e-16; 3 free; KKT signs and box hold: True; least lower-bound multiplier 7.543e-05
+  oracle weights (OSQP), nonzero:
+    w[83] = 0.100000000000
+    w[104] = 0.028289967148
+    w[126] = 0.071710032852
+
+Frac 48:
+  OSQP: solved, 325 iterations, polish status 1, objective -1.274900019588e-03
+  Clarabel: Solved
+  max |OSQP - Clarabel| = 1.182e-12
+  max |OSQP - KKT on active set| = 5.100e-16; 3 free; KKT signs and box hold: True; least lower-bound multiplier 7.543e-05
+  oracle weights (OSQP), nonzero:
+    w[83] = 0.100000000000
+    w[104] = 0.028289967147
+    w[126] = 0.071710032853

@@ -1,0 +1,30 @@
+--  The S0 spike's units: fixed-point kernels and an ADMM solve, each
+--  generic over the grid so one build measures every Frac.  Withs
+--  nothing.  MODE selects the profile: debug (-O0, contracts checked),
+--  release (-O3, language checks on, no -gnata) and unchecked (-O3,
+--  -gnatp: every check the proof discharges is removed).
+project Spike is
+
+   type Mode_Type is ("debug", "release", "unchecked");
+   Mode : Mode_Type := external ("MODE", "debug");
+
+   for Source_Dirs use ("src");
+   for Object_Dir use "obj/" & Mode;
+   for Create_Missing_Dirs use "True";
+
+   package Compiler is
+      Common := ("-g", "-gnatwa", "-gnatwe", "-gnat2022");
+
+      case Mode is
+         when "debug" =>
+            for Default_Switches ("Ada") use Common & ("-O0", "-gnata");
+
+         when "release" =>
+            for Default_Switches ("Ada") use Common & ("-O3", "-gnatn");
+
+         when "unchecked" =>
+            for Default_Switches ("Ada") use Common & ("-O3", "-gnatn", "-gnatp");
+      end case;
+   end Compiler;
+
+end Spike;

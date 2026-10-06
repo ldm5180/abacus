@@ -1,0 +1,22 @@
+with "aunit";
+with "../spike.gpr";
+
+--  The spike's AUnit suite.  Reads the fixtures under tests/data, so run
+--  it from spike/.
+project Tests is
+
+   for Source_Dirs use ("src");
+   for Object_Dir use "obj/" & Spike.Mode;
+   for Exec_Dir use "bin/" & Spike.Mode;
+   for Create_Missing_Dirs use "True";
+   for Main use ("test_runner.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use Spike.Compiler'Default_Switches ("Ada");
+   end Compiler;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es");
+   end Binder;
+
+end Tests;

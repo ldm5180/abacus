@@ -1,0 +1,8 @@
+/docs/tdd-log.md
+/spike/obj/
+/spike/bin/
+/spike/*/obj/
+/spike/*/bin/
+/spike/alire/
+/spike/config/
+/spike/lib/
