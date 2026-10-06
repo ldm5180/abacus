@@ -2,7 +2,11 @@ with Ada.Real_Time; use Ada.Real_Time;
 with Ada.Text_IO;
 with Ada.Unchecked_Deallocation;
 
+with Interfaces;
+
 with Abacus.Cholesky;
+with Abacus.Random;
+with Abacus.Sorting;
 with Abacus.Qp; use Abacus.Qp;
 with Abacus.Qp.Engine;
 with Abacus.Stats;
@@ -44,8 +48,10 @@ package body Bench_Runs is
    end Millis;
 
    procedure Report
-     (Profile, What : String; N : Index; Span : Time_Span; Note : String := "")
-   is
+     (Profile, What : String;
+      N             : Positive;
+      Span          : Time_Span;
+      Note          : String := "") is
    begin
       Ada.Text_IO.Put_Line
         (Profile
@@ -129,6 +135,54 @@ package body Bench_Runs is
       Free (Pr);
       Free (Work);
    end Time_Qp;
+
+   type Long_Access is access Abacus.Sorting.Long_Vector;
+   type Order_Access is access Abacus.Sorting.Order_Array;
+
+   procedure Free is new
+     Ada.Unchecked_Deallocation (Abacus.Sorting.Long_Vector, Long_Access);
+   procedure Free is new
+     Ada.Unchecked_Deallocation (Abacus.Sorting.Order_Array, Order_Access);
+
+   --  The seeds of the sort's values and keys.
+   Value_Seed : constant := 20261006;
+   Key_Seed   : constant := 7;
+
+   --  How many distinct values and keys the sort's data draws from: a
+   --  column of a few thousand names, and one of about a million days.
+   Distinct_Values : constant := 4_096;
+   Distinct_Keys   : constant := 2**20;
+
+   --  N seeded draws among Distinct values, in units of the grid.
+   function Drawn
+     (N : Positive; Seed, Distinct : Interfaces.Unsigned_64) return Long_Access
+   is
+      G : Abacus.Random.Generator := Abacus.Random.Seeded (Seed);
+      X : Interfaces.Unsigned_64;
+      V : constant Long_Access := new Abacus.Sorting.Long_Vector (1 .. N);
+   begin
+      for K in V'Range loop
+         Abacus.Random.Below (G, Distinct, X);
+         V (K) := Val (X);
+      end loop;
+      return V;
+   end Drawn;
+
+   procedure Time_Sort (Profile : String; N : Positive) is
+      Values  : Long_Access := Drawn (N, Value_Seed, Distinct_Values);
+      Keys    : Long_Access := Drawn (N, Key_Seed, Distinct_Keys);
+      Order   : Order_Access := new Abacus.Sorting.Order_Array (1 .. N);
+      Scratch : Order_Access := new Abacus.Sorting.Order_Array (1 .. N);
+      Start   : constant Time := Clock;
+   begin
+      Abacus.Sorting.Sort_Order (Values.all, Keys.all, Order.all, Scratch.all);
+      Report (Profile, "sort order", N, Clock - Start, "seeded");
+      Sink := Sink + Wide (Order (1));
+      Free (Values);
+      Free (Keys);
+      Free (Order);
+      Free (Scratch);
+   end Time_Sort;
 
    procedure Run_All (Profile : String; N : Index) is
    begin

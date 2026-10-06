@@ -3,8 +3,8 @@ with Ada.Text_IO;
 
 with Bench_Runs;
 
---  Times the kernels and the solver at 180 and 3,000 variables and
---  prints CSV: what, size, milliseconds, and a note.  The profile name
+--  Times the kernels and the solver at 180 and 3,000 variables, and the
+--  sort at a million and four million elements, and prints CSV: what, size, milliseconds, and a note.  The profile name
 --  on the command line heads each line.
 
 procedure Bench_Abacus is
@@ -16,5 +16,8 @@ begin
    Ada.Text_IO.Put_Line ("profile,what,size,ms,note");
    for Size of Bench_Runs.Sizes loop
       Bench_Runs.Run_All (Profile, Size);
+   end loop;
+   for Length of Bench_Runs.Sort_Lengths loop
+      Bench_Runs.Time_Sort (Profile, Length);
    end loop;
 end Bench_Abacus;

@@ -154,11 +154,15 @@ contracts off), the second of two runs (`bench/results/release.csv`):
 
 | | 180 | 3,000 |
 |---|---|---|
-| dot product | 0.20 us | 3.3 us |
-| rank update Z Z', 250 observations | 2.9 ms | 0.73 s |
-| Cholesky factor | 0.95 ms | 4.6 s |
-| the two triangular solves | 0.03 ms | 9.8 ms |
-| QP in correlation space, certified | 5.0 ms (60 iterations) | 10.5 s (200 iterations) |
+| dot product | 0.18 us | 2.3 us |
+| rank update Z Z', 250 observations | 2.0 ms | 0.53 s |
+| Cholesky factor | 0.61 ms | 3.6 s |
+| the two triangular solves | 0.02 ms | 7.8 ms |
+| QP in correlation space, certified | 3.2 ms (60 iterations) | 9.1 s (200 iterations) |
+
+| | 1,000,000 | 4,000,000 |
+|---|---|---|
+| sort order, values among 4,096, keys among 2**20, scratch from the heap | 0.17 s | 0.90 s |
 
 The QP at 3,000 pays two factorizations, one of them the convexity
 check.  Timings on one box move by up to 30% between runs at the small
