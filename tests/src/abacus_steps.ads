@@ -88,7 +88,10 @@ package Abacus_Steps is
       E_Check_Outcome,
       E_Check_Each,
       E_Check_Variable,
-      E_Check_Fewer);
+      E_Check_Fewer,
+      E_Load_Fixture,
+      E_Check_Oracle,
+      E_Check_Held);
 
    type Hook_Kind is (Fresh_World);
 
@@ -185,9 +188,10 @@ package Abacus_Steps is
    subtype Small_Vector is Abacus.Vector (1 .. Max_Variables);
 
    --  The problem qp.feature poses -- its matrix, objective, box and its
-   --  one row over every variable -- and the last solve's outcome,
-   --  answer and iterations, with the cold-start iterations beside a
-   --  warm start's.
+   --  one row over every variable, or the name of a fixture -- and the
+   --  last solve's outcome, answer and iterations, with the cold-start
+   --  iterations beside a warm start's; for a fixture, the largest gap
+   --  to the oracle's answer and how many variables are above zero.
    type Program is record
       N          : Variable_Count := 0;
       P          : Abacus.Matrix (1 .. Max_Variables, 1 .. Max_Variables) :=
@@ -204,6 +208,10 @@ package Abacus_Steps is
       Y_Row      : Abacus.Val := 0;
       Iterations : Natural := 0;
       Cold       : Natural := 0;
+      Fixture    : String (1 .. 16) := [others => ' '];
+      Named      : Natural := 0;
+      Worst      : Abacus.Raw := 0;
+      Held       : Natural := 0;
    end record;
 
    --  What one scenario holds.  fabula copies it per step, so it holds
@@ -391,7 +399,13 @@ package Abacus_Steps is
       Step ("each variable is {word}")       >= E_Check_Each,
       Step ("variable {int} is {word}")      >= E_Check_Variable,
       Step ("it took fewer iterations than a cold start does")
-                                             >= E_Check_Fewer];
+                                             >= E_Check_Fewer,
+      Step ("the {word} problem from the fixtures")
+                                             >= E_Load_Fixture,
+      Step ("the answer agrees with the oracle's within {word}")
+                                             >= E_Check_Oracle,
+      Step ("at least {int} variables are above zero")
+                                             >= E_Check_Held];
    --!format on
 
    Hook_Defs : constant Steps.Hook_Table := [Before >= Fresh_World];

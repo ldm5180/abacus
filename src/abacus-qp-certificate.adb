@@ -131,6 +131,28 @@ is
       end loop;
    end Delta_Of;
 
+   --  D projected onto the polar of the recession cone of [Lo, Hi], as
+   --  OSQP does: a dual may not rise toward an open upper bound nor fall
+   --  toward an open lower one, so that part of its change is dropped.
+   procedure Project (D : in out Vector; Lo, Hi : Vector)
+   with
+     Pre =>
+       Lo'First = D'First
+       and then Lo'Last = D'Last
+       and then Hi'First = D'First
+       and then Hi'Last = D'Last
+   is
+   begin
+      for I in D'Range loop
+         if Hi (I) = No_Upper then
+            D (I) := Val'Min (D (I), 0);
+         end if;
+         if Lo (I) = No_Lower then
+            D (I) := Val'Max (D (I), 0);
+         end if;
+      end loop;
+   end Project;
+
    --  The bounds' support of a change D in a row bounded by Lo and Hi:
    --  Hi D where D rises, Lo D where it falls.  Open is True when the
    --  bound D moves toward is open, so the support is unbounded.
@@ -217,6 +239,8 @@ is
    begin
       Delta_Of (St.Y, Last.Y, Dy, Ok_Box);
       Delta_Of (St.Y_Row, Last.Y_Row, Dy_Row, Ok_Row);
+      Project (Dy, Pr.Lo, Pr.Hi);
+      Project (Dy_Row, Pr.Row_Lo, Pr.Row_Hi);
       Norm :=
         Larger
           (Wide (Vectors.Norm_Inf (Dy)), Wide (Vectors.Norm_Inf (Dy_Row)));

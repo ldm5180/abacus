@@ -7,14 +7,16 @@ with Abacus.Qp; use Abacus.Qp;
 with Abacus.Qp.Engine;
 with Abacus.Text;
 
+with Abacus_Qp_Fixtures;
 with Abacus_Steps.Flows;
 
 package body Abacus_Steps.Qp is
 
-   --  Empty until a problem is posed; Posed while its parts are given;
+   --  Empty until a problem is posed; Posed while its parts are given,
+   --  or Loaded from a fixture;
    --  Settling while a solve's outcome settles; then Answered when it
    --  was certified, or Refused when it was not.
-   type Stage is (Empty, Posed, Settling, Answered, Refused);
+   type Stage is (Empty, Posed, Loaded, Settling, Answered, Refused);
 
    type Guard_Kind is
      (Always,
@@ -28,7 +30,9 @@ package body Abacus_Steps.Qp is
       Is_Certified,
       Outcome_Named,
       Value_Read,
-      Variable_Value_Read);
+      Variable_Value_Read,
+      Fixture_Read,
+      Count_Read);
 
    type Action_Kind is
      (A_Nothing,
@@ -43,10 +47,14 @@ package body Abacus_Steps.Qp is
       A_Sum_At_Most,
       A_Solve,
       A_Solve_Warm,
+      A_Load,
+      A_Solve_Fixture,
       A_Check_Outcome,
       A_Check_Each,
       A_Check_Variable,
       A_Check_Fewer,
+      A_Check_Oracle,
+      A_Check_Held,
       A_Refuse_Pose,
       A_Refuse_Part,
       A_Refuse_Outcome,
@@ -56,7 +64,7 @@ package body Abacus_Steps.Qp is
       A_Refuse_Unposed);
 
    subtype Pose_Action is Action_Kind range A_Pose_Identity .. A_Sum_At_Most;
-   subtype Check_Action is Action_Kind range A_Check_Outcome .. A_Check_Fewer;
+   subtype Check_Action is Action_Kind range A_Check_Outcome .. A_Check_Held;
    subtype Refuse_Action is
      Action_Kind range A_Refuse_Pose .. A_Refuse_Unposed;
 
@@ -162,6 +170,50 @@ package body Abacus_Steps.Qp is
       Solve (G, Warm => True);
    end Solve_Warm;
 
+   --  The fixtures tools/make_qp.py wrote.
+   function Is_Fixture (Name : String) return Boolean
+   is (Name in "spread" | "cvar" | "infeasible" | "nonconvex");
+
+   function Fixture_Name (G : Program) return String
+   is (G.Fixture (1 .. G.Named));
+
+   procedure Load (Ctx : in out Step_Context) is
+      Name : constant String := Fabula.Args.Word (Ctx.A, 1);
+   begin
+      Ctx.W.Qp := (Named => Name'Length, others => <>);
+      Ctx.W.Qp.Fixture (1 .. Name'Length) := Name;
+   end Load;
+
+   --  The largest gap from X to the oracle's answer, when there is one.
+   function Gap_To_Oracle (Name : String; X : Vector) return Raw is
+      Worst : Raw := 0;
+   begin
+      if Abacus_Qp_Fixtures.Has_Answer (Name) then
+         declare
+            Want : constant Vector := Abacus_Qp_Fixtures.Answer (Name);
+         begin
+            for I in Want'Range loop
+               Worst := Raw'Max (Worst, abs (X (I) - Want (I)));
+            end loop;
+         end;
+      end if;
+      return Worst;
+   end Gap_To_Oracle;
+
+   procedure Solve_Fixture (G : in out Program) is
+      Pr   : constant Problem := Abacus_Qp_Fixtures.Load (Fixture_Name (G));
+      Work : Workspace (Pr.N);
+      St   : State := Cold (Pr.N, Pr.K);
+   begin
+      Engine.Solve (Pr, Default_Settings, Work, St, G.Result);
+      G.Iterations := St.Iterations;
+      G.Worst := Gap_To_Oracle (Fixture_Name (G), St.X);
+      G.Held := 0;
+      for V of St.X loop
+         G.Held := G.Held + (if V > Billionth then 1 else 0);
+      end loop;
+   end Solve_Fixture;
+
    ---------------------------------------------------------------------
    --  Outcomes by name.
    ---------------------------------------------------------------------
@@ -213,7 +265,10 @@ package body Abacus_Steps.Qp is
            when Outcome_Named       => Is_Outcome (Ctx),
            when Value_Read          => Decimal_Read (Ctx),
            when Variable_Value_Read =>
-             Variable_Fits (Ctx) and then Decimal_Read (Ctx, 2));
+             Variable_Fits (Ctx) and then Decimal_Read (Ctx, 2),
+           when Fixture_Read        =>
+             Is_Fixture (Fabula.Args.Word (Ctx.A, 1)),
+           when Count_Read          => Units_Read (Ctx));
    end Evaluate;
 
    procedure Pose_Part (A : Pose_Action; Ctx : in out Step_Context) is
@@ -288,13 +343,28 @@ package body Abacus_Steps.Qp is
               (Ctx.R,
                G.Iterations < G.Cold,
                "warm" & G.Iterations'Image & ", cold" & G.Cold'Image);
+
+         when A_Check_Oracle   =>
+            Fabula.Check.Is_True
+              (Ctx.R,
+               G.Worst <= Decimal_Of (Ctx),
+               "the largest gap is " & Abacus.Text.Image (G.Worst));
+
+         when A_Check_Held     =>
+            Fabula.Check.Is_True
+              (Ctx.R,
+               Raw (G.Held) >= Units_Of (Ctx),
+               G.Held'Image & " variables are above zero");
       end case;
    end Check;
 
    function Refusal (A : Refuse_Action; Ctx : Step_Context) return String
    is (case A is
          when A_Refuse_Pose        =>
-           "a problem has 1 to" & Max_Variables'Image & " variables",
+           "a problem has 1 to"
+           & Max_Variables'Image
+           & " variables, or is one of the fixtures: spread, cvar,"
+           & " infeasible, nonconvex",
          when A_Refuse_Part        =>
            "a bound or a total is a decimal number, a variable one of the"
            & " problem's, and an objective one number per variable",
@@ -315,24 +385,31 @@ package body Abacus_Steps.Qp is
       pragma Unreferenced (Evt);
    begin
       case A is
-         when A_Nothing     =>
+         when A_Nothing       =>
             null;
 
-         when Pose_Action   =>
+         when Pose_Action     =>
             Pose_Part (A, Ctx);
 
-         when A_Solve       =>
+         when A_Solve         =>
             Solve (Ctx.W.Qp, Warm => False);
             Then_Take (Ctx, E_Qp_Settled);
 
-         when A_Solve_Warm  =>
+         when A_Solve_Warm    =>
             Solve_Warm (Ctx);
             Then_Take (Ctx, E_Qp_Settled);
 
-         when Check_Action  =>
+         when A_Load          =>
+            Load (Ctx);
+
+         when A_Solve_Fixture =>
+            Solve_Fixture (Ctx.W.Qp);
+            Then_Take (Ctx, E_Qp_Settled);
+
+         when Check_Action    =>
             Check (A, Ctx);
 
-         when Refuse_Action =>
+         when Refuse_Action   =>
             Fabula.Check.Fail_Step (Ctx.R, Refusal (A, Ctx));
       end case;
    end Execute;
@@ -367,6 +444,9 @@ package body Abacus_Steps.Qp is
    Check_Each      : constant Ev := (Kind => E_Check_Each);
    Check_Variable  : constant Ev := (Kind => E_Check_Variable);
    Check_Fewer     : constant Ev := (Kind => E_Check_Fewer);
+   Load_Fixture    : constant Ev := (Kind => E_Load_Fixture);
+   Check_Oracle    : constant Ev := (Kind => E_Check_Oracle);
+   Check_Held      : constant Ev := (Kind => E_Check_Held);
 
    --!format off
    Table : constant Transition_Table :=
@@ -376,6 +456,9 @@ package body Abacus_Steps.Qp is
       Empty    + Pose_Linear                           / A_Refuse_Pose        >= Empty,
       Empty    + Pose_Diagonal   (Diagonal_Read)       / A_Pose_Diagonal      >= Posed,
       Empty    + Pose_Diagonal                         / A_Refuse_Pose        >= Empty,
+      Empty    + Load_Fixture    (Fixture_Read)        / A_Load               >= Loaded,
+      Empty    + Load_Fixture                          / A_Refuse_Pose        >= Empty,
+      Loaded   + Solve_Qp                              / A_Solve_Fixture      >= Settling,
       Empty    + Solve_Qp                              / A_Refuse_Unposed     >= Empty,
       Empty    + Check_Certified                       / A_Refuse_Unposed     >= Empty,
       Posed    + Bound_All       (Bounds_Read)         / A_Bound_All          >= Posed,
@@ -403,6 +486,10 @@ package body Abacus_Steps.Qp is
       Answered + Check_Variable  (Variable_Value_Read) / A_Check_Variable     >= Answered,
       Answered + Check_Variable                        / A_Refuse_Value       >= Answered,
       Answered + Check_Fewer                           / A_Check_Fewer        >= Answered,
+      Answered + Check_Oracle    (Value_Read)          / A_Check_Oracle       >= Answered,
+      Answered + Check_Oracle                          / A_Refuse_Value       >= Answered,
+      Answered + Check_Held      (Count_Read)          / A_Check_Held         >= Answered,
+      Answered + Check_Held                            / A_Refuse_Value       >= Answered,
       Refused  + Check_Outcome   (Outcome_Named)       / A_Check_Outcome      >= Refused,
       Refused  + Check_Outcome                         / A_Refuse_Outcome     >= Refused,
       Refused  + Check_Certified                       / A_Refuse_Uncertified >= Refused,

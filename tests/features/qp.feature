@@ -76,3 +76,25 @@ Feature: Quadratic programs
     And it is solved again from that answer with the linear objective -0.125, 0
     Then the answer is certified
     And it took fewer iterations than a cold start does
+
+  Scenario: An answer holding dozens of assets, with caps and two budgets, agrees with OSQP's
+    Given the spread problem from the fixtures
+    When it is solved
+    Then the answer is certified
+    And at least 40 variables are above zero
+    And the answer agrees with the oracle's within 0.000001
+
+  Scenario: A large problem that cannot be met is refused as infeasible
+    Given the infeasible problem from the fixtures
+    When it is solved
+    Then the outcome is infeasible
+
+  Scenario: A large matrix that is not positive semidefinite is refused as not convex
+    Given the nonconvex problem from the fixtures
+    When it is solved
+    Then the outcome is not convex
+
+  Scenario: An answer the solver cannot certify is reported so, never as certified
+    Given the cvar problem from the fixtures
+    When it is solved
+    Then the outcome is exhausted

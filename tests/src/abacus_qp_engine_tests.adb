@@ -3,6 +3,7 @@ with AUnit.Assertions; use AUnit.Assertions;
 with Abacus;             use Abacus;
 with Abacus.Qp;          use Abacus.Qp;
 with Abacus.Qp.Certificate;
+with Abacus_Qp_Fixtures;
 with Abacus_Qp_Problems; use Abacus_Qp_Problems;
 
 package body Abacus_Qp_Engine_Tests is
@@ -149,6 +150,81 @@ package body Abacus_Qp_Engine_Tests is
          "warm" & Warm.Iterations'Image & ", cold" & Cold_St.Iterations'Image);
    end Test_Warm;
 
+   --  A fixture's problem solved from cold: its outcome, iterations, and
+   --  the largest gap to the oracle's answer.
+   type Fixture_Run is record
+      Result     : Outcome;
+      Iterations : Natural;
+      Worst      : Raw;
+   end record;
+
+   function Run_Fixture (Name : String; S : Settings) return Fixture_Run is
+      Pr  : constant Problem := Abacus_Qp_Fixtures.Load (Name);
+      St  : State := Cold (Pr.N, Pr.K);
+      Run : Fixture_Run;
+   begin
+      Run.Result := Solved (Pr, S, St);
+      Run.Iterations := St.Iterations;
+      Run.Worst := 0;
+      if Abacus_Qp_Fixtures.Has_Answer (Name) then
+         declare
+            Want : constant Vector := Abacus_Qp_Fixtures.Answer (Name);
+         begin
+            for I in Want'Range loop
+               Run.Worst := Raw'Max (Run.Worst, abs (St.X (I) - Want (I)));
+            end loop;
+         end;
+      end if;
+      return Run;
+   end Run_Fixture;
+
+   --  A millionth: the bar the answers of the fixtures are held to.
+   Millionth : constant := One / 1_000_000;
+
+   function Report (R : Fixture_Run) return String
+   is (R.Result'Image
+       & " after"
+       & R.Iterations'Image
+       & " iterations, worst"
+       & R.Worst'Image
+       & " units");
+
+   --  120 assets, 44 held, 35 at their cap, an at-most budget binding
+   --  beside an exact one: certified, within a millionth of OSQP's.
+   procedure Test_Spread (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      R : constant Fixture_Run := Run_Fixture ("spread", Default_Settings);
+   begin
+      Assert (R.Result = Certified and then R.Worst <= Millionth, Report (R));
+   end Test_Spread;
+
+   --  The conditional value-at-risk linear program is not certified:
+   --  ADMM, like OSQP (which runs to 400,000 iterations on it), creeps
+   --  at residuals near 1e-6, so the cap is reached.  What holds is that
+   --  it is reported as such, never as certified, and that the weights
+   --  are within a thousandth of the simplex's.
+   procedure Test_Cvar (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Thousandth : constant := One / 1_000;
+      R          : constant Fixture_Run :=
+        Run_Fixture ("cvar", (Default_Settings with delta Max_Iter => 40_000));
+   begin
+      Assert (R.Result = Exhausted and then R.Worst <= Thousandth, Report (R));
+   end Test_Cvar;
+
+   procedure Test_Fixture_Refusals
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Infeasible_Run : constant Fixture_Run :=
+        Run_Fixture ("infeasible", Default_Settings);
+      Nonconvex_Run  : constant Fixture_Run :=
+        Run_Fixture ("nonconvex", Default_Settings);
+   begin
+      Assert (Infeasible_Run.Result = Infeasible, Report (Infeasible_Run));
+      Assert (Nonconvex_Run.Result = Not_Convex, Report (Nonconvex_Run));
+   end Test_Fixture_Refusals;
+
    overriding
    procedure Register_Tests (T : in out Test) is
       use AUnit.Test_Cases.Registration;
@@ -162,6 +238,12 @@ package body Abacus_Qp_Engine_Tests is
       Register_Routine (T, Test_Unbounded'Access, "Unbounded");
       Register_Routine (T, Test_Exhausted'Access, "Exhausted");
       Register_Routine (T, Test_Warm'Access, "A warm start");
+      Register_Routine (T, Test_Spread'Access, "The spread fixture");
+      Register_Routine (T, Test_Cvar'Access, "The CVaR linear program");
+      Register_Routine
+        (T,
+         Test_Fixture_Refusals'Access,
+         "Infeasible and non-convex fixtures");
    end Register_Tests;
 
    overriding
