@@ -31,4 +31,19 @@ package Spike.Linear with SPARK_Mode is
        and then D'First = A'First (1)
        and then D'Last = A'Last (1);
 
+   type Solve_Result is (Solved, Out_Of_Range);
+
+   --  L L' x = B, in place: the forward solve, then the back solve, with
+   --  L and D as Factor leaves them.  Each entry is checked into range as
+   --  it is stored; one past it ends the solve.
+   procedure Solve
+     (L : Matrix; D : Pivots; B : in out Vector; Result : out Solve_Result)
+   with
+     Pre =>
+       Is_Square (L)
+       and then D'First = L'First (1)
+       and then D'Last = L'Last (1)
+       and then B'First = L'First (1)
+       and then B'Last = L'Last (1);
+
 end Spike.Linear;

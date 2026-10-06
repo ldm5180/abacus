@@ -12,7 +12,7 @@ is
    is (Wide (Len) * Term_Bound);
 
    function Dot
-     (M : Matrix; I, J : Index; From : Index; To : Count) return Dot_Sum
+     (M : Matrix; I, J : Index; From : Positive; To : Count) return Dot_Sum
    is
       Acc : Wide := 0;
    begin
@@ -26,7 +26,7 @@ is
    end Dot;
 
    function Dot
-     (M : Matrix; I : Index; V : Vector; From : Index; To : Count)
+     (M : Matrix; I : Index; V : Vector; From : Positive; To : Count)
       return Dot_Sum
    is
       Acc : Wide := 0;

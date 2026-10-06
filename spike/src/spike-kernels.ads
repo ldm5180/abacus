@@ -8,7 +8,7 @@ is
    --  The sum over columns From .. To of M (I, K) * M (J, K); zero when
    --  the range is empty.
    function Dot
-     (M : Matrix; I, J : Index; From : Index; To : Count) return Dot_Sum
+     (M : Matrix; I, J : Index; From : Positive; To : Count) return Dot_Sum
    with
      Pre =>
        I in M'Range (1)
@@ -19,7 +19,7 @@ is
    --  The sum over K in From .. To of M (I, K) * V (K); zero when the
    --  range is empty.
    function Dot
-     (M : Matrix; I : Index; V : Vector; From : Index; To : Count)
+     (M : Matrix; I : Index; V : Vector; From : Positive; To : Count)
       return Dot_Sum
    with
      Pre =>

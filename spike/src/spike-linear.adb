@@ -110,6 +110,54 @@ is
       end loop;
    end Mirror;
 
+   --  Entry I of a triangular solve: (B (I) - the dot of row I of L with
+   --  B over From .. To) / D (I), stored if it fits.
+   procedure Solve_Entry
+     (L    : Matrix;
+      D    : Pivots;
+      B    : in out Vector;
+      I    : Index;
+      From : Positive;
+      To   : Count;
+      Ok   : out Boolean)
+   with
+     Pre =>
+       Is_Square (L)
+       and then I in L'Range (1)
+       and then D'First = L'First (1)
+       and then D'Last = L'Last (1)
+       and then B'First = L'First (1)
+       and then B'Last = L'Last (1)
+       and then (if From <= To
+                 then From >= L'First (1) and then To <= L'Last (1))
+   is
+      Q : constant Wide :=
+        Div_Round (Wide (B (I)) * One - Dot (L, I, B, From, To), D (I));
+   begin
+      Ok := Fits (Q);
+      if Ok then
+         B (I) := Val (Q);
+      end if;
+   end Solve_Entry;
+
+   procedure Solve
+     (L : Matrix; D : Pivots; B : in out Vector; Result : out Solve_Result)
+   is
+      Ok : Boolean := True;
+   begin
+      for I in L'Range (1) loop
+         Solve_Entry (L, D, B, I, L'First (1), I - 1, Ok);
+         exit when not Ok;
+      end loop;
+      if Ok then
+         for I in reverse L'Range (1) loop
+            Solve_Entry (L, D, B, I, I + 1, L'Last (1), Ok);
+            exit when not Ok;
+         end loop;
+      end if;
+      Result := (if Ok then Solved else Out_Of_Range);
+   end Solve;
+
    procedure Factor
      (A       : in out Matrix;
       D       : out Pivots;
