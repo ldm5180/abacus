@@ -40,6 +40,34 @@ is
       return Acc;
    end Dot;
 
+   function Dot_Columns (M : Matrix; I, J : Index) return Dot_Sum is
+      Acc : Wide := 0;
+   begin
+      for R in M'Range (1) loop
+         Acc := Acc + Term (M (R, I), M (R, J));
+         pragma
+           Loop_Invariant
+             (Acc
+              in -Sum_Bound (R - M'First (1) + 1)
+               .. Sum_Bound (R - M'First (1) + 1));
+      end loop;
+      return Acc;
+   end Dot_Columns;
+
+   function Dot_Column (M : Matrix; I : Index; V : Vector) return Dot_Sum is
+      Acc : Wide := 0;
+   begin
+      for R in M'Range (1) loop
+         Acc := Acc + Term (M (R, I), V (R));
+         pragma
+           Loop_Invariant
+             (Acc
+              in -Sum_Bound (R - M'First (1) + 1)
+               .. Sum_Bound (R - M'First (1) + 1));
+      end loop;
+      return Acc;
+   end Dot_Column;
+
    --  Bit by bit from 2**56 down: R is the largest integer whose square
    --  is at most X, then one comparison rounds it to nearest.  R stays
    --  under 2**57 because its square is under 2**114; the clamp on the

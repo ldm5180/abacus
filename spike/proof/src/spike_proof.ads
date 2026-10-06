@@ -1,3 +1,4 @@
+with Spike.Admm;
 with Spike.Delta_Types; use Spike.Delta_Types;
 with Spike.Deltas;
 with Spike.Estimate;
@@ -22,6 +23,10 @@ is
    package Estimate_32 is new Spike.Estimate (32);
    package Estimate_40 is new Spike.Estimate (40);
    package Estimate_48 is new Spike.Estimate (48);
+
+   package Admm_32 is new Spike.Admm (32);
+   package Admm_40 is new Spike.Admm (40);
+   package Admm_48 is new Spike.Admm (48);
 
    package Deltas_32 is new Spike.Deltas (Fix_32, Acc_32);
    package Deltas_40 is new Spike.Deltas (Fix_40, Acc_40);

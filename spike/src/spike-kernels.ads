@@ -31,6 +31,23 @@ is
                    and then From >= V'First
                    and then To <= V'Last);
 
+   --  The sum over rows R of M (R, I) * M (R, J): a dot product of two
+   --  columns, for a matrix with few rows.
+   function Dot_Columns (M : Matrix; I, J : Index) return Dot_Sum
+   with
+     Pre =>
+       I in M'Range (2)
+       and then J in M'Range (2)
+       and then M'Length (1) <= Max_N;
+
+   --  The sum over rows R of M (R, I) * V (R).
+   function Dot_Column (M : Matrix; I : Index; V : Vector) return Dot_Sum
+   with
+     Pre =>
+       I in M'Range (2)
+       and then V'First = M'First (1)
+       and then V'Last = M'Last (1);
+
    --  Whether a wide result can be stored as a value.
    function Fits (W : Wide) return Boolean
    is (W in Wide (Val'First) .. Wide (Val'Last));
