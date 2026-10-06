@@ -1,6 +1,6 @@
---  Products on the grid, each rounded once to nearest with ties away
---  from zero.  A product is formed at 128 bits and proved to fit before
---  it is narrowed.
+--  Products and quotients on the grid, each rounded once to nearest
+--  with ties away from zero.  A result is formed at 128 bits and proved
+--  to fit before it is narrowed.
 
 package Abacus.Arith
   with SPARK_Mode, Pure
@@ -41,9 +41,21 @@ is
    function Product_Of (A, B : Val) return Wide
    is (Round_Shift (Wide (A) * Wide (B)));
 
+   --  A over B, rounded once to the grid.
+   function Quotient_Of (A, B : Val) return Wide
+   is (if B > 0
+       then Div_Round (Wide (A) * One, Wide (B))
+       else Div_Round (-(Wide (A) * One), -Wide (B)))
+   with Pre => B /= 0;
+
    --  A times B, where the caller has shown that the product fits.
    function Mul (A, B : Val) return Val
    is (Val (Product_Of (A, B)))
    with Pre => Fits (Product_Of (A, B));
+
+   --  A over B, where the caller has shown that the quotient fits.
+   function Div (A, B : Val) return Val
+   is (Val (Quotient_Of (A, B)))
+   with Pre => B /= 0 and then Fits (Quotient_Of (A, B));
 
 end Abacus.Arith;
