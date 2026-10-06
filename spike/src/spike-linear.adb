@@ -107,33 +107,41 @@ is
       end loop;
    end Mirror;
 
-   --  Entry I of a triangular solve: (B (I) - the dot of row I of L with
-   --  B over From .. To) / D (I), stored if it fits.
-   procedure Solve_Entry
-     (L    : Matrix;
-      D    : Pivots;
-      B    : in out Vector;
-      I    : Index;
+   --  Which entry of a triangular solve, and the columns its row is
+   --  dotted over: From .. To, empty for the first entry of a pass.
+   type Solve_Span is record
+      Row  : Index;
       From : Positive;
       To   : Count;
-      Ok   : out Boolean)
+   end record;
+
+   --  Entry Row of a triangular solve: (B (Row) - the dot of row Row of
+   --  L with B over From .. To) / D (Row), stored if it fits.
+   procedure Solve_Entry
+     (L  : Matrix;
+      D  : Pivots;
+      B  : in out Vector;
+      E  : Solve_Span;
+      Ok : out Boolean)
    with
      Pre =>
        Is_Square (L)
-       and then I in L'Range (1)
+       and then E.Row in L'Range (1)
        and then D'First = L'First (1)
        and then D'Last = L'Last (1)
        and then B'First = L'First (1)
        and then B'Last = L'Last (1)
-       and then (if From <= To
-                 then From >= L'First (1) and then To <= L'Last (1))
+       and then (if E.From <= E.To
+                 then E.From >= L'First (1) and then E.To <= L'Last (1))
    is
       Q : constant Wide :=
-        Div_Round (Wide (B (I)) * One - Dot (L, I, B, From, To), Wide (D (I)));
+        Div_Round
+          (Wide (B (E.Row)) * One - Dot (L, E.Row, B, E.From, E.To),
+           Wide (D (E.Row)));
    begin
       Ok := Fits (Q);
       if Ok then
-         B (I) := Val (Q);
+         B (E.Row) := Val (Q);
       end if;
    end Solve_Entry;
 
@@ -143,12 +151,12 @@ is
       Ok : Boolean := True;
    begin
       for I in L'Range (1) loop
-         Solve_Entry (L, D, B, I, L'First (1), I - 1, Ok);
+         Solve_Entry (L, D, B, (I, L'First (1), I - 1), Ok);
          exit when not Ok;
       end loop;
       if Ok then
          for I in reverse L'Range (1) loop
-            Solve_Entry (L, D, B, I, I + 1, L'Last (1), Ok);
+            Solve_Entry (L, D, B, (I, I + 1, L'Last (1)), Ok);
             exit when not Ok;
          end loop;
       end if;

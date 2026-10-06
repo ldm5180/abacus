@@ -10,11 +10,14 @@ package Spike.Grid with SPARK_Mode, Pure is
 
    --  A value at scale One * One brought to scale One, rounded half away
    --  from zero.  The margin keeps the bias inside 128 bits.
-   subtype Product is Wide range -(2**126) .. 2**126;
+   Product_Bound : constant := 2**126;
+   subtype Product is Wide range -Product_Bound .. Product_Bound;
 
    function Round (A : Product) return Wide
    is (if A >= 0 then (A + Half) / One else -((-A + Half) / One))
-   with Post => Round'Result in (-(2**126)) / One - 1 .. 2**126 / One + 1;
+   with
+     Post =>
+       Round'Result in (-Product_Bound) / One - 1 .. Product_Bound / One + 1;
 
    --  A product of two values, rounded once to the grid.
    function Mul (A, B : Val) return Wide

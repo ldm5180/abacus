@@ -13,6 +13,13 @@ package body Bench_Integers is
 
    One : constant Raw := 2**Frac;
 
+   --  The bench matrix's correlations: 0.73 within a block, -0.26
+   --  between; and a multiplier just under one.
+   Within_Block  : constant Raw := One / 100 * 73;
+   Between_Block : constant Raw := -(One / 100 * 26);
+   Near_One      : constant Raw := One - One / 1_000_000;
+   Low_Bits      : constant := 1_024;
+
    --  Two blocks of half the size each: 0.73 within a block, -0.26
    --  between, one on the diagonal; positive definite at any size.
    procedure Fill_Blocks (M : in out Matrix) is
@@ -24,8 +31,8 @@ package body Bench_Integers is
               (if I = J
                then One
                elsif (I <= Half) = (J <= Half)
-               then One / 100 * 73
-               else -(One / 100 * 26));
+               then Within_Block
+               else Between_Block);
          end loop;
       end loop;
    end Fill_Blocks;
@@ -41,7 +48,7 @@ package body Bench_Integers is
       Start := Clock;
       for R in 1 .. Repeats loop
          M (1, 1 + R mod N) := M (1, 1 + R mod N) + 1;
-         Sink := Sink + Spike.Kernels.Dot (M, 1, 2, 1, N) mod 1_024;
+         Sink := Sink + Spike.Kernels.Dot (M, 1, 2, 1, N) mod Low_Bits;
       end loop;
       Report_Per ("dot ns per term (b)", Frac, N, Clock - Start, N * Repeats);
    end Time_Dot;
@@ -60,7 +67,7 @@ package body Bench_Integers is
 
    procedure Time_Mul (N : Index; Repeats : Positive) is
       V     : Vector (1 .. N) := [others => One / 3];
-      S     : Val := One - One / 1_000_000;
+      S     : Val := Near_One;
       Start : Time;
    begin
       Start := Clock;

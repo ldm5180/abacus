@@ -143,31 +143,40 @@ is
       end if;
    end Factor;
 
-   procedure Solve_Entry
-     (L    : Fix_Matrix;
-      D    : Pivots;
-      B    : in out Fix_Vector;
-      I    : Index;
+   --  Which entry of a triangular solve, and the columns its row is
+   --  dotted over: From .. To, empty for the first entry of a pass.
+   type Solve_Span is record
+      Row  : Index;
       From : Positive;
       To   : Count;
-      Ok   : out Boolean)
+   end record;
+
+   --  Entry Row of a triangular solve: (B (Row) - the dot of row Row of
+   --  L with B over From .. To) / D (Row), stored if it fits.
+   procedure Solve_Entry
+     (L  : Fix_Matrix;
+      D  : Pivots;
+      B  : in out Fix_Vector;
+      E  : Solve_Span;
+      Ok : out Boolean)
    with
      Pre =>
        Roomy
        and then Is_Square (L)
-       and then I in L'Range (1)
+       and then E.Row in L'Range (1)
        and then D'First = L'First (1)
        and then D'Last = L'Last (1)
        and then B'First = L'First (1)
        and then B'Last = L'Last (1)
-       and then (if From <= To
-                 then From >= L'First (1) and then To <= L'Last (1))
+       and then (if E.From <= E.To
+                 then E.From >= L'First (1) and then E.To <= L'Last (1))
    is
       Q : Fix;
    begin
-      Quotient (Acc (B (I)) - Dot (L, I, B, From, To), D (I), Q, Ok);
+      Quotient
+        (Acc (B (E.Row)) - Dot (L, E.Row, B, E.From, E.To), D (E.Row), Q, Ok);
       if Ok then
-         B (I) := Q;
+         B (E.Row) := Q;
       end if;
    end Solve_Entry;
 
@@ -180,12 +189,12 @@ is
       Ok : Boolean := True;
    begin
       for I in L'Range (1) loop
-         Solve_Entry (L, D, B, I, L'First (1), I - 1, Ok);
+         Solve_Entry (L, D, B, (I, L'First (1), I - 1), Ok);
          exit when not Ok;
       end loop;
       if Ok then
          for I in reverse L'Range (1) loop
-            Solve_Entry (L, D, B, I, I + 1, L'Last (1), Ok);
+            Solve_Entry (L, D, B, (I, I + 1, L'Last (1)), Ok);
             exit when not Ok;
          end loop;
       end if;

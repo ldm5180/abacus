@@ -132,30 +132,27 @@ is
       end loop;
    end Right_Side;
 
-   --  One row's relaxed projection and dual update, given its new value
-   --  Tilde and its bounds.
-   type Row_Input is record
+   --  What one row's step needs: its new value Tilde, its bounds, the
+   --  relaxation and the row's step size.
+   type Row_Step is record
       Tilde : Val;
       Lo    : Val;
       Hi    : Val;
+      Alpha : Val;
+      Rho   : Shift;
    end record;
 
-   procedure Update
-     (R    : Row_Input;
-      S    : Settings;
-      Rho  : Shift;
-      Z, Y : in out Val;
-      Ok   : in out Boolean)
-   is
+   --  One row's relaxed projection and dual update.
+   procedure Update (R : Row_Step; Z, Y : in out Val; Ok : in out Boolean) is
       Hat   : Val := 0;
       Step  : Val := 0;
       New_Z : Val;
    begin
       Store (Wide (R.Tilde) - Wide (Z), Step, Ok);
-      Store (Wide (Z) + Mul (S.Alpha, Step), Hat, Ok);
-      New_Z := Clamp (Wide (Hat) + Shifted (Y, -Rho), R.Lo, R.Hi);
+      Store (Wide (Z) + Mul (R.Alpha, Step), Hat, Ok);
+      New_Z := Clamp (Wide (Hat) + Shifted (Y, -R.Rho), R.Lo, R.Hi);
       Store (Wide (Hat) - Wide (New_Z), Step, Ok);
-      Store (Wide (Y) + Shifted (Step, Rho), Y, Ok);
+      Store (Wide (Y) + Shifted (Step, R.Rho), Y, Ok);
       Z := New_Z;
    end Update;
 
@@ -174,9 +171,7 @@ is
          Store (Wide (Tilde (I)) - Wide (St.X (I)), Step, Ok);
          Store (Wide (St.X (I)) + Mul (S.Alpha, Step), St.X (I), Ok);
          Update
-           ((Tilde (I), Pr.Lo (I), Pr.Hi (I)),
-            S,
-            S.Rho_Shift,
+           ((Tilde (I), Pr.Lo (I), Pr.Hi (I), S.Alpha, S.Rho_Shift),
             St.Z (I),
             St.Y (I),
             Ok);
@@ -202,9 +197,7 @@ is
       for R in 1 .. Pr.K loop
          Store (G.Round (Dot (Pr.E, R, Tilde, 1, Pr.N)), Ex, Ok);
          Update
-           ((Ex, Pr.Row_Lo (R), Pr.Row_Hi (R)),
-            S,
-            S.Row_Shift,
+           ((Ex, Pr.Row_Lo (R), Pr.Row_Hi (R), S.Alpha, S.Row_Shift),
             St.Z_Row (R),
             St.Y_Row (R),
             Ok);

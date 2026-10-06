@@ -16,6 +16,11 @@ package body Bench_Bucket is
 
    One : constant Raw := 2**Frac;
 
+   --  The accuracy bar, 1e-6, raw.
+   Within : constant Raw := One / 1_000_000;
+
+   Two_To_30 : constant := 1_073_741_824;
+
    type Matrix_Access is access Matrix;
    type Problem_Access is access B.A.Problem;
 
@@ -23,7 +28,7 @@ package body Bench_Bucket is
    Oracle  : constant Vector := Fixtures.Weights (Frac);
 
    function Image (Raw_Value : Raw) return String
-   is (Duration'Image (Duration (Raw_Value) / 2**(Frac - 30) / 1_073_741_824));
+   is (Duration'Image (Duration (Raw_Value) / 2**(Frac - 30) / Two_To_30));
 
    --  The z-scores' correlation and the moments of the bucket.
    procedure Estimate (C : out Matrix; M : out B.E.Moments) is
@@ -87,77 +92,96 @@ package body Bench_Bucket is
       Put_Line ("trace," & Label & "," & Frac'Image & ", " & What);
    end Say;
 
-   procedure Trace_Problem
-     (Pr     : B.A.Problem;
-      M      : B.E.Moments;
-      Scaled : Boolean;
+   --  What one trace is about, and what it has seen so far.
+   type Context (Length : Natural) is record
       S      : B.A.Settings;
-      Label  : String)
+      Scaled : Boolean;
+      Label  : String (1 .. Length);
+   end record;
+
+   type Marks is record
+      First : Natural := 0;
+      Stop  : Natural := 0;
+      Res   : B.A.Residual := (0, 0);
+      D     : Raw := Raw'Last;
+   end record;
+
+   function Residual_Text (Res : B.A.Residual) return String
+   is ("primal" & Res.Primal'Image & ", dual" & Res.Dual'Image);
+
+   --  A check after iteration It: the residuals, the distance, and the
+   --  first iteration within 1e-6 and where the rule stops, each said
+   --  once.
+   procedure Mark
+     (Pr  : B.A.Problem;
+      M   : B.E.Moments;
+      St  : B.A.State;
+      Ctx : Context;
+      Mk  : in out Marks)
+   is
+      It : constant Natural := St.Iterations;
+   begin
+      Mk.Res := B.A.Residuals (Pr, St);
+      Mk.D := Distance (M, St, Ctx.Scaled);
+      if Mk.First = 0 and then Mk.D <= Within then
+         Mk.First := It;
+         Say
+           (Ctx.Label,
+            "within 1e-6 at" & It'Image & ": " & Residual_Text (Mk.Res));
+      end if;
+      if Mk.Stop = 0
+        and then Mk.Res.Primal <= Wide (Ctx.S.Tol_Primal)
+        and then Mk.Res.Dual <= Wide (Ctx.S.Tol_Dual)
+      then
+         Mk.Stop := It;
+         Say
+           (Ctx.Label,
+            "rule stops at" & It'Image & ", distance" & Image (Mk.D));
+      end if;
+   end Mark;
+
+   procedure Trace_Problem (Pr : B.A.Problem; M : B.E.Moments; Ctx : Context)
    is
       F     : B.A.Factored (N);
       St    : B.A.State := B.A.Cold (N, K);
       Setup : B.A.Prepare_Result;
-      Ok    : Boolean;
-      Res   : B.A.Residual := (0, 0);
-      D     : Raw := Raw'Last;
-      First : Natural := 0;
-      Stop  : Natural := 0;
+      Ok    : Boolean := True;
+      Mk    : Marks;
    begin
-      B.A.Prepare (Pr, S, F, Setup);
+      B.A.Prepare (Pr, Ctx.S, F, Setup);
       if Setup /= B.A.Ready then
-         Say (Label, "prepare " & Setup'Image);
+         Say (Ctx.Label, "prepare " & Setup'Image);
          return;
       end if;
-      for It in 1 .. S.Max_Iter loop
-         B.A.Iterate (Pr, S, F, St, Ok);
+      for It in 1 .. Ctx.S.Max_Iter loop
+         B.A.Iterate (Pr, Ctx.S, F, St, Ok);
          exit when not Ok;
-         if It mod S.Check_Every = 0 then
-            Res := B.A.Residuals (Pr, St);
-            D := Distance (M, St, Scaled);
-            if First = 0 and then D <= One / 1_000_000 then
-               First := It;
-               Say
-                 (Label,
-                  "within 1e-6 at"
-                  & It'Image
-                  & ": primal"
-                  & Res.Primal'Image
-                  & ", dual"
-                  & Res.Dual'Image);
-            end if;
-            if Stop = 0
-              and then Res.Primal <= Wide (S.Tol_Primal)
-              and then Res.Dual <= Wide (S.Tol_Dual)
-            then
-               Stop := It;
-               Say
-                 (Label,
-                  "rule stops at" & It'Image & ", distance" & Image (D));
-            end if;
+         if It mod Ctx.S.Check_Every = 0 then
+            Mark (Pr, M, St, Ctx, Mk);
          end if;
       end loop;
       Say
-        (Label,
+        (Ctx.Label,
          "after"
          & St.Iterations'Image
          & ": distance"
-         & D'Image
+         & Mk.D'Image
          & " raw ="
-         & Image (D)
-         & ", primal"
-         & Res.Primal'Image
-         & ", dual"
-         & Res.Dual'Image
+         & Image (Mk.D)
+         & ", "
+         & Residual_Text (Mk.Res)
          & ", ok "
          & Ok'Image);
    end Trace_Problem;
 
    procedure Trace (S : B.A.Settings; Label : String; Scaled : Boolean := True)
    is
-      C  : constant Matrix_Access := new Matrix (1 .. N, 1 .. N);
-      M  : B.E.Moments (N);
-      Pr : constant Problem_Access := new B.A.Problem (N, K);
-      Ok : Boolean;
+      C    : constant Matrix_Access := new Matrix (1 .. N, 1 .. N);
+      M    : B.E.Moments (N);
+      Pr   : constant Problem_Access := new B.A.Problem (N, K);
+      Ok   : Boolean;
+      Name : constant String :=
+        Label & (if Scaled then " scaled" else " unscaled");
    begin
       Estimate (C.all, M);
       if Scaled then
@@ -165,12 +189,7 @@ package body Bench_Bucket is
       else
          Form_Unscaled (C.all, M, Pr.all);
       end if;
-      Trace_Problem
-        (Pr.all,
-         M,
-         Scaled,
-         S,
-         Label & (if Scaled then " scaled" else " unscaled"));
+      Trace_Problem (Pr.all, M, (Name'Length, S, Scaled, Name));
    end Trace;
 
    procedure Time_Stages (S : B.A.Settings; Runs : Positive) is

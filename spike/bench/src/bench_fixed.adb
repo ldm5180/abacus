@@ -15,6 +15,9 @@ package body Bench_Fixed is
    Three   : constant Integer := Integer'Value ("3");
    Seven   : constant Integer := Integer'Value ("7");
 
+   --  A multiplier just under one.
+   Near_One : constant Fix := 1.0 - Fix'Small * 1_000;
+
    procedure Fill_Blocks (M : in out Fix_Matrix) is
       Half : constant Index := M'Last (1) / 2;
    begin
@@ -62,7 +65,7 @@ package body Bench_Fixed is
 
    procedure Time_Mul (N : Index; Repeats : Positive) is
       V     : Fix_Vector (1 .. N) := [others => Fix'(1.0) / Three];
-      S     : Fix := 1.0 - Fix'Small * 1_000;
+      S     : Fix := Near_One;
       Start : Time;
    begin
       Start := Clock;
