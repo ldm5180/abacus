@@ -31,5 +31,5 @@ format:
 
 ## no-float  No floating-point type anywhere in the spike's Ada
 no-float:
-	! grep -rniE '\b(long_)*float\b|\bdigits\b|elementary_functions' \
+	! grep -rniE '\b(long_|short_)*float\b|\bis\s+digits\b|elementary_functions' \
 	  --include='*.ad[sb]' src tests/src bench/src proof/src harness
