@@ -40,4 +40,25 @@ is
       return Acc;
    end Dot;
 
+   --  Bit by bit from 2**56 down: R is the largest integer whose square
+   --  is at most X, then one comparison rounds it to nearest.  R stays
+   --  under 2**57 because its square is under 2**114; the clamp on the
+   --  rounded result states that without a nonlinear proof.
+   function Root (X : Root_Arg) return Val is
+      R    : Wide := 0;
+      Step : Wide := 2**56;
+   begin
+      for B in 0 .. 56 loop
+         if (R + Step) * (R + Step) <= X then
+            R := R + Step;
+         end if;
+         Step := Step / 2;
+         pragma
+           Loop_Invariant
+             (R >= 0 and then Step >= 0 and then R + 2 * Step <= 2**57);
+         pragma Loop_Invariant (R * R <= X);
+      end loop;
+      return Val (Wide'Min ((if X - R * R > R then R + 1 else R), Val_Bound));
+   end Root;
+
 end Spike.Kernels;

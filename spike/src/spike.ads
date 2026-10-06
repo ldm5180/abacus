@@ -35,6 +35,10 @@ is
    Dot_Bound : constant := Max_N * Term_Bound;
    subtype Dot_Sum is Wide range -Dot_Bound .. Dot_Bound;
 
+   --  A pivot of a factorization: positive, so it can be divided by.
+   subtype Pivot is Val range 1 .. Val'Last;
+   type Pivots is array (Index range <>) of Pivot;
+
    --  The grids the spike measures, and the widest it allows.
    subtype Frac_Bits is Natural range 16 .. 52;
 

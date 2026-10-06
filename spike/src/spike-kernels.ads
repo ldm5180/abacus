@@ -31,4 +31,22 @@ is
                    and then From >= V'First
                    and then To <= V'Last);
 
+   --  The nearest integer to the square root of X.  An argument at scale
+   --  One * One gives a root at scale One.
+   subtype Root_Arg is Wide range 0 .. Term_Bound - 1;
+
+   function Root (X : Root_Arg) return Val
+   with Post => Root'Result >= 0;
+
+   --  A dot product less a value at scale One, for every grid: the
+   --  numerator of every quotient a kernel takes.
+   Numerator_Bound : constant := Dot_Bound + 2**110;
+   subtype Numerator is Wide range -Numerator_Bound .. Numerator_Bound;
+
+   --  S / D rounded half away from zero.
+   function Div_Round (S : Numerator; D : Pivot) return Wide
+   is (if S >= 0
+       then (S + Wide (D) / 2) / Wide (D)
+       else -((-S + Wide (D) / 2) / Wide (D)));
+
 end Spike.Kernels;
