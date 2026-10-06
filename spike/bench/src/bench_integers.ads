@@ -12,4 +12,8 @@ package Bench_Integers is
 
    procedure Time_Factor (N : Index);
 
+   --  Repeats a rescaling multiply of each of N values by one value;
+   --  reports ns per multiply.
+   procedure Time_Mul (N : Index; Repeats : Positive);
+
 end Bench_Integers;

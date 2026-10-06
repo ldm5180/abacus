@@ -31,6 +31,17 @@ procedure Bench_Spike is
    package B48 is new Bench_Bucket (48);
 
 begin
+   B32.Trace (B32.B.Default_Settings, "default");
+   B40.Trace (B40.B.Default_Settings, "default");
+   B48.Trace (B48.B.Default_Settings, "default");
+   B32.Trace (B32.B.Default_Settings, "default", Scaled => False);
+   B40.Trace (B40.B.Default_Settings, "default", Scaled => False);
+   B48.Trace (B48.B.Default_Settings, "default", Scaled => False);
+   B32.Time_Stages (B32.B.Default_Settings, 5);
+   B40.Time_Stages (B40.B.Default_Settings, 5);
+   B48.Time_Stages (B48.B.Default_Settings, 5);
+   I40.Time_Mul (180, 100_000);
+   F40.Time_Mul (180, 100_000);
    for Row of Row_Shifts loop
       B32.Trace
         ((B32.B.Default_Settings

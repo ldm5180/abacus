@@ -13,4 +13,8 @@ package Bench_Fixed is
 
    procedure Time_Factor (N : Index);
 
+   --  As Bench_Integers.Time_Mul: Ada's own fixed-point multiply, the
+   --  product converted back to Fix.
+   procedure Time_Mul (N : Index; Repeats : Positive);
+
 end Bench_Fixed;

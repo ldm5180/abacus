@@ -1,0 +1,93 @@
+trace,default scaled, 32, within 1e-6 at 110: primal 10, dual 7
+trace,default scaled, 32, after 4000: distance 191 raw = 0.000000044, primal 7, dual 16, ok TRUE
+trace,default scaled, 40, within 1e-6 at 110: primal 801, dual 1698
+trace,default scaled, 40, rule stops at 140, distance 0.000000071
+trace,default scaled, 40, after 4000: distance 246 raw = 0.000000000, primal 13, dual 6, ok TRUE
+trace,default scaled, 48, within 1e-6 at 110: primal 205513, dual 432724
+trace,default scaled, 48, rule stops at 140, distance 0.000000071
+trace,default scaled, 48, after 4000: distance 211 raw = 0.000000000, primal 7, dual 10, ok TRUE
+trace,default unscaled, 32, within 1e-6 at 540: primal 51, dual 2448
+trace,default unscaled, 32, after 4000: distance 48 raw = 0.000000011, primal 11, dual 12, ok TRUE
+trace,default unscaled, 40, within 1e-6 at 540: primal 12002, dual 628687
+trace,default unscaled, 40, rule stops at 1020, distance 0.000000006
+trace,default unscaled, 40, after 4000: distance 30 raw = 0.000000000, primal 19, dual 14, ok TRUE
+trace,default unscaled, 48, within 1e-6 at 540: primal 3072965, dual 160944825
+trace,default unscaled, 48, rule stops at 1010, distance 0.000000008
+trace,default unscaled, 48, after 4000: distance 39 raw = 0.000000000, primal 16, dual 13, ok TRUE
+release,stage estimate, 32, 180, 2.562541000
+release,stage form and factor, 32, 180, 0.864641000
+release,stage solve, its own factor included, EXHAUSTED 4000 iterations, 32, 180, 112.466800000
+release,stage estimate, 40, 180, 2.587740000
+release,stage form and factor, 40, 180, 0.867997000
+release,stage solve, its own factor included, CONVERGED 140 iterations, 40, 180, 4.691934000
+release,stage estimate, 48, 180, 2.572340000
+release,stage form and factor, 48, 180, 0.868077000
+release,stage solve, its own factor included, CONVERGED 140 iterations, 48, 180, 4.690011000
+release,mul ns (b), 40, 180, 1.059516277
+release,mul ns (a), 40, 180, 11.728126833
+trace,row 2 scaled, 32, within 1e-6 at 150: primal 9, dual 7
+trace,row 2 scaled, 32, after 2000: distance 357 raw = 0.000000083, primal 12, dual 23, ok TRUE
+trace,row 2 scaled, 40, within 1e-6 at 150: primal 2240, dual 1166
+trace,row 2 scaled, 40, rule stops at 200, distance 0.000000019
+trace,row 2 scaled, 40, after 2000: distance 191 raw = 0.000000000, primal 10, dual 5, ok TRUE
+trace,row 2 scaled, 48, within 1e-6 at 150: primal 573199, dual 298741
+trace,row 2 scaled, 48, rule stops at 200, distance 0.000000019
+trace,row 2 scaled, 48, after 2000: distance 179 raw = 0.000000000, primal 7, dual 4, ok TRUE
+trace,row 3 scaled, 32, within 1e-6 at 110: primal 10, dual 7
+trace,row 3 scaled, 32, after 2000: distance 191 raw = 0.000000044, primal 7, dual 17, ok TRUE
+trace,row 3 scaled, 40, within 1e-6 at 110: primal 801, dual 1698
+trace,row 3 scaled, 40, rule stops at 140, distance 0.000000071
+trace,row 3 scaled, 40, after 2000: distance 237 raw = 0.000000000, primal 11, dual 19, ok TRUE
+trace,row 3 scaled, 48, within 1e-6 at 110: primal 205513, dual 432724
+trace,row 3 scaled, 48, rule stops at 140, distance 0.000000071
+trace,row 3 scaled, 48, after 2000: distance 237 raw = 0.000000000, primal 7, dual 11, ok TRUE
+trace,row 4 scaled, 32, within 1e-6 at 130: primal 7, dual 7
+trace,row 4 scaled, 32, after 2000: distance 222 raw = 0.000000051, primal 7, dual 7, ok TRUE
+trace,row 4 scaled, 40, within 1e-6 at 130: primal 586, dual 1396
+trace,row 4 scaled, 40, rule stops at 150, distance 0.000000120
+trace,row 4 scaled, 40, after 2000: distance 206 raw = 0.000000000, primal 7, dual 8, ok TRUE
+trace,row 4 scaled, 48, within 1e-6 at 130: primal 148533, dual 357006
+trace,row 4 scaled, 48, rule stops at 150, distance 0.000000120
+trace,row 4 scaled, 48, after 2000: distance 222 raw = 0.000000000, primal 11, dual 14, ok TRUE
+trace,row 6 scaled, 32, within 1e-6 at 130: primal 8, dual 8
+trace,row 6 scaled, 32, after 2000: distance 286 raw = 0.000000066, primal 10, dual 8, ok TRUE
+trace,row 6 scaled, 40, within 1e-6 at 130: primal 641, dual 1648
+trace,row 6 scaled, 40, rule stops at 150, distance 0.000000132
+trace,row 6 scaled, 40, after 2000: distance 369 raw = 0.000000000, primal 13, dual 20, ok TRUE
+trace,row 6 scaled, 48, within 1e-6 at 130: primal 164891, dual 420928
+trace,row 6 scaled, 48, rule stops at 150, distance 0.000000132
+trace,row 6 scaled, 48, after 2000: distance 242 raw = 0.000000000, primal 9, dual 18, ok TRUE
+trace,row 8 scaled, 32, within 1e-6 at 130: primal 10, dual 35
+trace,row 8 scaled, 32, after 2000: distance 331 raw = 0.000000077, primal 12, dual 52, ok TRUE
+trace,row 8 scaled, 40, within 1e-6 at 130: primal 627, dual 1592
+trace,row 8 scaled, 40, rule stops at 150, distance 0.000000129
+trace,row 8 scaled, 40, after 2000: distance 270 raw = 0.000000000, primal 11, dual 62, ok TRUE
+trace,row 8 scaled, 48, within 1e-6 at 130: primal 162408, dual 419815
+trace,row 8 scaled, 48, rule stops at 150, distance 0.000000129
+trace,row 8 scaled, 48, after 2000: distance 237 raw = 0.000000000, primal 14, dual 43, ok TRUE
+trace,row 10 scaled, 32, within 1e-6 at 130: primal 10, dual 187
+trace,row 10 scaled, 32, after 2000: distance 198 raw = 0.000000046, primal 11, dual 214, ok TRUE
+trace,row 10 scaled, 40, within 1e-6 at 130: primal 627, dual 1474
+trace,row 10 scaled, 40, rule stops at 150, distance 0.000000129
+trace,row 10 scaled, 40, after 2000: distance 377 raw = 0.000000000, primal 13, dual 146, ok TRUE
+trace,row 10 scaled, 48, within 1e-6 at 130: primal 161662, dual 419010
+trace,row 10 scaled, 48, rule stops at 150, distance 0.000000129
+trace,row 10 scaled, 48, after 2000: distance 237 raw = 0.000000000, primal 13, dual 138, ok TRUE
+release,bucket DONE EXHAUSTED 4000 iterations, 32, 180, 115.005985000
+release,bucket DONE CONVERGED 140 iterations, 40, 180, 7.213155000
+release,bucket DONE CONVERGED 140 iterations, 48, 180, 7.215981000
+release,dot ns per term (b), 40, 3000, 0.494434463
+release,dot ns per term (a), 40, 3000, 0.784060503
+release,factor (b) FACTORED, 32, 180, 0.650642000
+release,factor (b) FACTORED, 40, 180, 0.654380000
+release,factor (b) FACTORED, 48, 180, 0.656162000
+release,factor (a) DONE, 32, 180, 1.130781000
+release,factor (a) DONE, 40, 180, 1.161020000
+release,factor (a) DONE, 48, 180, 1.135080000
+release,factor (b) FACTORED, 32, 3000, 3520.174331000
+release,factor (b) FACTORED, 40, 3000, 3570.642683000
+release,factor (b) FACTORED, 48, 3000, 3525.166542000
+release,factor (a) DONE, 32, 3000, 4907.554924000
+release,factor (a) DONE, 40, 3000, 4915.822299000
+release,factor (a) DONE, 48, 3000, 5105.064957000
+sink 330172827396

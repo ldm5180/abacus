@@ -1,11 +1,13 @@
 with Ada.Real_Time; use Ada.Real_Time;
 with Bench_Report;  use Bench_Report;
+with Spike.Grid;
 with Spike.Kernels;
 with Spike.Linear;
 
 package body Bench_Integers is
 
    package L is new Spike.Linear (Frac);
+   package G is new Spike.Grid (Frac);
 
    type Matrix_Access is access Matrix;
 
@@ -55,5 +57,21 @@ package body Bench_Integers is
       L.Factor (M.all, D, 1, Outcome);
       Report ("factor (b) " & Outcome.Result'Image, Frac, N, Clock - Start);
    end Time_Factor;
+
+   procedure Time_Mul (N : Index; Repeats : Positive) is
+      V     : Vector (1 .. N) := [others => One / 3];
+      S     : Val := One - One / 1_000_000;
+      Start : Time;
+   begin
+      Start := Clock;
+      for R in 1 .. Repeats loop
+         for I in V'Range loop
+            V (I) := Val (G.Mul (V (I), S)) + 1;
+         end loop;
+         S := S - 1;
+      end loop;
+      Report_Per ("mul ns (b)", Frac, N, Clock - Start, N * Repeats);
+      Sink := Sink + Wide (V (N));
+   end Time_Mul;
 
 end Bench_Integers;

@@ -60,4 +60,20 @@ package body Bench_Fixed is
       Report ("factor (a) " & Outcome'Image, Frac, N, Clock - Start);
    end Time_Factor;
 
+   procedure Time_Mul (N : Index; Repeats : Positive) is
+      V     : Fix_Vector (1 .. N) := [others => Fix'(1.0) / Three];
+      S     : Fix := 1.0 - Fix'Small * 1_000;
+      Start : Time;
+   begin
+      Start := Clock;
+      for R in 1 .. Repeats loop
+         for I in V'Range loop
+            V (I) := Fix (V (I) * S) + Fix'Small;
+         end loop;
+         S := S - Fix'Small;
+      end loop;
+      Report_Per ("mul ns (a)", Frac, N, Clock - Start, N * Repeats);
+      Sink := Sink + (if V (N) > 0.0 then 1 else 0);
+   end Time_Mul;
+
 end Bench_Fixed;
