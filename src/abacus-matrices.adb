@@ -97,13 +97,18 @@ is
       Mirror (G);
    end Gram;
 
-   procedure Mirror (A : in out Matrix) is
+   procedure Mirror_Leading (A : in out Matrix; Size : Count) is
    begin
-      for I in A'Range (1) loop
+      for I in A'First (1) .. A'First (1) + Size - 1 loop
          for J in A'First (1) .. I - 1 loop
             A (J, I) := A (I, J);
          end loop;
       end loop;
+   end Mirror_Leading;
+
+   procedure Mirror (A : in out Matrix) is
+   begin
+      Mirror_Leading (A, A'Length (1));
    end Mirror;
 
 end Abacus.Matrices;

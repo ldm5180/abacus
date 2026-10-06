@@ -37,6 +37,31 @@ package body Abacus_Cholesky_Tests is
          "x = (1.25, 1.5)");
    end Test_Solve;
 
+   --  The leading block alone: factored and solved as a matrix of its
+   --  own, whatever lies past it, which is left as it was.
+   procedure Test_Leading (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      A       : Matrix (1 .. 3, 1 .. 3) :=
+        [[4 * One, 0, 0], [2 * One, 3 * One, 0], [One, One, -One]];
+      D       : Pivots (1 .. 3);
+      Outcome : Factor_Outcome;
+      B       : Vector (1 .. 3) := [8 * One, 7 * One, 9 * One];
+      Result  : Solve_Result;
+   begin
+      Factor_Leading (A, D, 2, 1, Outcome);
+      Assert (Outcome = (Factored, 0), "the block factored");
+      Assert (A (3, 3) = -One and then A (1, 3) = 0, "past it, untouched");
+      Solve_Leading (A, D, B, 2, Result);
+      Assert (Result = Solved, "solved");
+      Assert
+        (abs (B (1) - 5 * One / 4) <= 2
+         and then abs (B (2) - 3 * One / 2) <= 2,
+         "x = (1.25, 1.5)");
+      Assert (B (3) = 9 * One, "past the block, untouched");
+      Factor_Leading (A, D, 3, 1, Outcome);
+      Assert (Outcome.Column = 3, "the whole is refused at its third column");
+   end Test_Leading;
+
    --  A pivot under the floor, or a negative one, names its column.
    procedure Test_Refused (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
@@ -77,6 +102,7 @@ package body Abacus_Cholesky_Tests is
       Register_Routine (T, Test_Factor'Access, "A = L L'");
       Register_Routine (T, Test_Solve'Access, "Two triangular solves");
       Register_Routine (T, Test_Refused'Access, "Refused at its column");
+      Register_Routine (T, Test_Leading'Access, "A leading block alone");
       Register_Routine (T, Test_Least_Squares'Access, "Least squares");
    end Register_Tests;
 

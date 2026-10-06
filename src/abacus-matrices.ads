@@ -87,4 +87,9 @@ is
    procedure Mirror (A : in out Matrix)
    with Pre => Is_Square (A);
 
+   --  The upper triangle of the leading Size by Size block from its
+   --  lower; the rest of A left as it was.
+   procedure Mirror_Leading (A : in out Matrix; Size : Count)
+   with Pre => Is_Square (A) and then Size <= A'Length (1);
+
 end Abacus.Matrices;

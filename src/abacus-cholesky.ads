@@ -41,6 +41,27 @@ is
         then Outcome.Column = 0
         else Outcome.Column in A'Range (1));
 
+   --  The leading Size by Size block of A factored as Factor factors a
+   --  matrix; past the block A is left as it was, and D is one.
+   procedure Factor_Leading
+     (A       : in out Matrix;
+      D       : out Pivots;
+      Size    : Count;
+      Floor   : Pivot;
+      Outcome : out Factor_Outcome)
+   with
+     Pre  =>
+       Matrices.Is_Square (A)
+       and then D'First = A'First (1)
+       and then D'Last = A'Last (1)
+       and then Size <= A'Length (1),
+     Post =>
+       (if Outcome.Result = Factored
+        then Outcome.Column = 0
+        else
+          Outcome.Column in A'Range (1)
+          and then Outcome.Column < A'First (1) + Size);
+
    type Solve_Result is (Solved, Out_Of_Range);
 
    --  L L' x = B, in place: the forward solve, then the back solve, with
@@ -55,6 +76,23 @@ is
        and then D'Last = L'Last (1)
        and then B'First = L'First (1)
        and then B'Last = L'Last (1);
+
+   --  The two solves over the leading Size entries of B, with the
+   --  leading block Factor_Leading left; B past them is left as it was.
+   procedure Solve_Leading
+     (L      : Matrix;
+      D      : Pivots;
+      B      : in out Vector;
+      Size   : Count;
+      Result : out Solve_Result)
+   with
+     Pre =>
+       Matrices.Is_Square (L)
+       and then D'First = L'First (1)
+       and then D'Last = L'Last (1)
+       and then B'First = L'First (1)
+       and then B'Last = L'Last (1)
+       and then Size <= L'Length (1);
 
    --  The Beta that minimizes |X Beta - Y|**2 + Ridge |Beta|**2, from
    --  (X'X + Ridge I) Beta = X'Y.  A Gram matrix whose pivots fall to a

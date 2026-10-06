@@ -83,7 +83,7 @@ is
      Post =>
        (if Outcome.Result = Factored
         then Outcome.Column = 0
-        else Outcome.Column in A'Range (1))
+        else Outcome.Column in A'First (1) .. I)
    is
       Ok     : Boolean;
       Result : Factor_Result;
@@ -99,22 +99,32 @@ is
       Outcome := (Result, (if Result = Factored then 0 else I));
    end Factor_Row;
 
+   procedure Factor_Leading
+     (A       : in out Matrix;
+      D       : out Pivots;
+      Size    : Count;
+      Floor   : Pivot;
+      Outcome : out Factor_Outcome) is
+   begin
+      D := [others => 1];
+      Outcome := (Factored, 0);
+      for I in A'First (1) .. A'First (1) + Size - 1 loop
+         Factor_Row (A, D, I, Floor, Outcome);
+         exit when Outcome.Result /= Factored;
+         pragma Loop_Invariant (Outcome = (Factored, 0));
+      end loop;
+      if Outcome.Result = Factored then
+         Mirror_Leading (A, Size);
+      end if;
+   end Factor_Leading;
+
    procedure Factor
      (A       : in out Matrix;
       D       : out Pivots;
       Floor   : Pivot;
       Outcome : out Factor_Outcome) is
    begin
-      D := [others => 1];
-      Outcome := (Factored, 0);
-      for I in A'Range (1) loop
-         Factor_Row (A, D, I, Floor, Outcome);
-         exit when Outcome.Result /= Factored;
-         pragma Loop_Invariant (Outcome = (Factored, 0));
-      end loop;
-      if Outcome.Result = Factored then
-         Mirror (A);
-      end if;
+      Factor_Leading (A, D, A'Length (1), Floor, Outcome);
    end Factor;
 
    --  Which entry of a triangular solve, and the columns its row is
@@ -155,22 +165,33 @@ is
       end if;
    end Solve_Entry;
 
-   procedure Solve
-     (L : Matrix; D : Pivots; B : in out Vector; Result : out Solve_Result)
+   procedure Solve_Leading
+     (L      : Matrix;
+      D      : Pivots;
+      B      : in out Vector;
+      Size   : Count;
+      Result : out Solve_Result)
    is
-      Ok : Boolean := True;
+      Last : constant Integer := L'First (1) + Size - 1;
+      Ok   : Boolean := True;
    begin
-      for I in L'Range (1) loop
+      for I in L'First (1) .. Last loop
          Solve_Entry (L, D, B, (I, L'First (1), I - 1), Ok);
          exit when not Ok;
       end loop;
       if Ok then
-         for I in reverse L'Range (1) loop
-            Solve_Entry (L, D, B, (I, I + 1, L'Last (1)), Ok);
+         for I in reverse L'First (1) .. Last loop
+            Solve_Entry (L, D, B, (I, I + 1, Count (Last)), Ok);
             exit when not Ok;
          end loop;
       end if;
       Result := (if Ok then Solved else Out_Of_Range);
+   end Solve_Leading;
+
+   procedure Solve
+     (L : Matrix; D : Pivots; B : in out Vector; Result : out Solve_Result) is
+   begin
+      Solve_Leading (L, D, B, L'Length (1), Result);
    end Solve;
 
    --  The normal equations G Beta = C of a least-squares fit.
