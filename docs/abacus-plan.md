@@ -140,7 +140,9 @@ are not SPARK (AUnit, files, a clock, the heap).
 *unchecked* adds `-gnatp`, removing every check the proof discharges.
 One thread.  Each profile was run twice and the second run kept
 (`spike/bench/results/`); the bucket is the best of five
-`Solve_Bucket` calls.  At Frac 40 the bucket splits as estimate 2.59
+`Solve_Bucket` calls.  Between runs the 3,000 factor moved by up to
+about 10% (3.52 s and 3.98 s at Frac 32), the bucket by under 1%.  At
+Frac 40 the bucket splits as estimate 2.59
 ms (1.89), form and factor 0.87 ms (0.69), solve 4.69 ms (3.82, its
 own factor included).  The iteration traces are byte-identical in both
 profiles.
