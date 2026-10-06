@@ -81,6 +81,7 @@ package Abacus_Steps is
       E_Sum_At_Most,
       E_Solve_Qp,
       E_Solve_Warm,
+      E_Solve_Unpolished,
       --  An event no pattern names: a solve posts it, and the next row's
       --  guard reads whether it was certified.
       E_Qp_Settled,
@@ -394,6 +395,8 @@ package Abacus_Steps is
       Step ("it is solved")                  >= E_Solve_Qp,
       Step ("it is solved again from that answer with the linear objective {}")
                                              >= E_Solve_Warm,
+      Step ("it is solved without the polish")
+                                             >= E_Solve_Unpolished,
       Step ("the answer is certified")       >= E_Check_Certified,
       Step ("the outcome is {}")             >= E_Check_Outcome,
       Step ("each variable is {word}")       >= E_Check_Each,

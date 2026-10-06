@@ -3,7 +3,9 @@ Feature: Quadratic programs
   Minimize (1/2) x'P x + q'x subject to lo <= x <= hi and
   row_lo <= E x <= row_hi.  The answer is certified: its primal and
   dual residuals and its complementarity are computed at 128 bits and
-  each held within its tolerance.  A problem that cannot be met is
+  each held within its tolerance.  Once the iteration is near, the
+  problem is solved exactly with the bounds the iterate holds -- the
+  polish -- and that answer is kept when it is certified.  A problem that cannot be met is
   refused as infeasible, one whose objective falls without end as
   unbounded, and one whose matrix is not positive semidefinite as not
   convex.
@@ -94,7 +96,19 @@ Feature: Quadratic programs
     When it is solved
     Then the outcome is not convex
 
-  Scenario: An answer the solver cannot certify is reported so, never as certified
+  Scenario: A tail-mean linear program, its bounds boxed by its data, is certified by the polish
+    Given the tail_bounded problem from the fixtures
+    When it is solved
+    Then the answer is certified
+    And the answer agrees with the oracle's within 0.000001
+
+  Scenario: The same program with its threshold and shortfalls unbounded is certified too
     Given the tail problem from the fixtures
     When it is solved
+    Then the answer is certified
+    And the answer agrees with the oracle's within 0.000001
+
+  Scenario: An answer the solver cannot certify is reported so, never as certified
+    Given the tail problem from the fixtures
+    When it is solved without the polish
     Then the outcome is exhausted

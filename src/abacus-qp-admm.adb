@@ -62,6 +62,10 @@ is
       Work.D := [others => 1];
       Work.Box_Side := [others => Free];
       Work.Row_Side := [others => Free];
+      Work.Free_At := [others => 1];
+      Work.Row_At := [others => 1];
+      Work.Free_Count := 0;
+      Work.Row_Count := 0;
       Work.A := [others => [others => 0]];
       Work.S := [others => [others => 0]];
       Work.S_D := [others => 1];
@@ -299,6 +303,14 @@ is
        and then A.Z_Row = B.Z_Row
        and then A.Y_Row = B.Y_Row);
 
+   --  Whether a polish is due at St: asked for, at a multiple of its
+   --  interval, and both residuals within its reach.
+   function Polish_Due (S : Settings; St : State; R : Residual) return Boolean
+   is (S.Polish_Every > 0
+       and then St.Iterations mod S.Polish_Every = 0
+       and then R.Primal <= Wide (S.Polish_Below)
+       and then R.Dual <= Wide (S.Polish_Below));
+
    procedure Check
      (Pr   : Problem;
       S    : Settings;
@@ -318,7 +330,7 @@ is
       elsif Same (St, Last) then
          V := Held;
       else
-         V := Moving;
+         V := (if Polish_Due (S, St, R) then Near else Moving);
          Last := St;
       end if;
    end Check;

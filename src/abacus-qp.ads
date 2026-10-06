@@ -49,37 +49,47 @@ is
    --  The relaxation, between one and two.
    subtype Relaxation is Val range One .. 2 * One - 1;
 
+   --  How many iterations apart a polish is tried; zero never.
+   subtype Polish_Interval is Natural range 0 .. Iteration_Cap'Last;
+
    --  The steps on the box rows, on the general rows, and of the
    --  proximal term; the relaxation; the iteration cap; how often the
    --  residuals and the infeasibility certificates are checked; the
-   --  tolerances; and the infeasibility test's ratio, 2**-Infeasible.
+   --  tolerances; the infeasibility test's ratio, 2**-Infeasible; and
+   --  the polish: tried at a check whose iteration count is a multiple of
+   --  Polish_Every, when both residuals are within Polish_Below.
    type Settings is record
-      Rho_Shift   : Shift;
-      Row_Shift   : Shift;
-      Sigma_Shift : Shift;
-      Alpha       : Relaxation;
-      Max_Iter    : Iteration_Cap;
-      Check_Every : Check_Interval;
-      Tol         : Tolerance;
-      Infeasible  : Natural range 0 .. Frac;
+      Rho_Shift    : Shift;
+      Row_Shift    : Shift;
+      Sigma_Shift  : Shift;
+      Alpha        : Relaxation;
+      Max_Iter     : Iteration_Cap;
+      Check_Every  : Check_Interval;
+      Tol          : Tolerance;
+      Infeasible   : Natural range 0 .. Frac;
+      Polish_Every : Polish_Interval;
+      Polish_Below : Nonnegative;
    end record;
 
    --  The settings S0 measured on a problem in correlation space: rho 1,
    --  rho_row 2**3, sigma 2**-20, alpha 1.6, and tolerances of 1e-10
    --  (primal) and 1e-9 (dual and complementarity).  A small rho_row
-   --  keeps the general rows' duals on a fine lattice.
+   --  keeps the general rows' duals on a fine lattice.  A polish every
+   --  100 iterations once both residuals are within 1e-3.
    Default_Settings : constant Settings :=
-     (Rho_Shift   => 0,
-      Row_Shift   => 3,
-      Sigma_Shift => -20,
-      Alpha       => One * 8 / 5,
-      Max_Iter    => 4_000,
-      Check_Every => 10,
-      Tol         =>
+     (Rho_Shift    => 0,
+      Row_Shift    => 3,
+      Sigma_Shift  => -20,
+      Alpha        => One * 8 / 5,
+      Max_Iter     => 4_000,
+      Check_Every  => 10,
+      Tol          =>
         (Primal => One / 10_000_000_000,
          Dual   => One / 1_000_000_000,
          Gap    => One / 1_000_000_000),
-      Infeasible  => 16);
+      Infeasible   => 16,
+      Polish_Every => 100,
+      Polish_Below => One / 1_000);
 
    --  The iterate: x, the projected box rows z and their duals y, the
    --  same for the general rows, and the iterations taken.  A state
@@ -109,25 +119,35 @@ is
    type Side is (Free, At_Lower, At_Upper);
    type Sides is array (Index range <>) of Side;
 
+   --  Places in a vector: the polish's maps from its packed systems back
+   --  to the problem's variables and rows.
+   type Places is array (Index range <>) of Index;
+
    --  What a solve works in, held by the caller so that a large
    --  problem's need not live on the stack: the matrix the iteration
    --  solves with, factored; and the polish's -- the bounds it holds,
-   --  the held rows of E over the free columns (A), and the two matrices
-   --  it solves with, A'A + delta P + delta**2 I and A A' + delta**2 I,
-   --  factored.
+   --  the free variables and held rows in order (Free_At, Row_At, the
+   --  first Free_Count and Row_Count of each), E's held rows over the
+   --  free columns packed into A, and the two matrices it solves with,
+   --  A'A + delta P + delta**2 I and A A' + delta**2 I, factored in their
+   --  leading blocks.
    type Workspace
      (N : Index;
       K : Count)
    is record
-      L        : Matrix (1 .. N, 1 .. N);
-      D        : Cholesky.Pivots (1 .. N);
-      Box_Side : Sides (1 .. N);
-      Row_Side : Sides (1 .. K);
-      A        : Matrix (1 .. K, 1 .. N);
-      S        : Matrix (1 .. N, 1 .. N);
-      S_D      : Cholesky.Pivots (1 .. N);
-      G        : Matrix (1 .. K, 1 .. K);
-      G_D      : Cholesky.Pivots (1 .. K);
+      L          : Matrix (1 .. N, 1 .. N);
+      D          : Cholesky.Pivots (1 .. N);
+      Box_Side   : Sides (1 .. N);
+      Row_Side   : Sides (1 .. K);
+      Free_At    : Places (1 .. N);
+      Row_At     : Places (1 .. K);
+      Free_Count : Count;
+      Row_Count  : Count;
+      A          : Matrix (1 .. K, 1 .. N);
+      S          : Matrix (1 .. N, 1 .. N);
+      S_D        : Cholesky.Pivots (1 .. N);
+      G          : Matrix (1 .. K, 1 .. K);
+      G_D        : Cholesky.Pivots (1 .. K);
    end record;
 
    function Fits_Work (Pr : Problem; Work : Workspace) return Boolean

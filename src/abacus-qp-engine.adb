@@ -2,6 +2,7 @@ with Sml.Machines;
 with Sml.Machines.Operators;
 
 with Abacus.Qp.Admm;
+with Abacus.Qp.Polish;
 
 package body Abacus.Qp.Engine
   with SPARK_Mode
@@ -9,7 +10,8 @@ is
 
    type Guard_Kind is (Always, Due, Capped);
 
-   type Action_Kind is (Nothing, Ask_Step, Ask_Check, Ask_Certify, Ask_Stop);
+   type Action_Kind is
+     (Nothing, Ask_Step, Ask_Check, Ask_Polish, Ask_Certify, Ask_Stop);
 
    type Event (Kind : Event_Kind := E_Ready) is null record;
 
@@ -42,6 +44,7 @@ is
            when Nothing     => Ctx.Request,
            when Ask_Step    => Step,
            when Ask_Check   => Check,
+           when Ask_Polish  => Polish,
            when Ask_Certify => Certify,
            when Ask_Stop    => Stop);
    end Execute;
@@ -69,14 +72,15 @@ is
    Primal_Infeasible : constant Ev := (Kind => E_Primal_Infeasible);
    Dual_Infeasible   : constant Ev := (Kind => E_Dual_Infeasible);
    Held              : constant Ev := (Kind => E_Held);
+   Near              : constant Ev := (Kind => E_Near);
    Moving            : constant Ev := (Kind => E_Moving);
    Passed            : constant Ev := (Kind => E_Passed);
    Not_Passed        : constant Ev := (Kind => E_Not_Passed);
 
    --  From + Event (Guard) / Action >= To.  A step is checked when the
    --  check is due or the cap is reached; converged residuals are then
-   --  certified, and an answer that is not yet certified iterates on
-   --  until the cap.
+   --  certified, and an iterate near enough is polished; an answer that
+   --  is not yet certified iterates on until the cap.
    --!format off
    Table : constant Transition_Table :=
      [Preparing  + Ready                      / Ask_Step    >= Iterating,
@@ -89,8 +93,12 @@ is
       Checking   + Primal_Infeasible          / Ask_Stop    >= Infeasible,
       Checking   + Dual_Infeasible            / Ask_Stop    >= Unbounded,
       Checking   + Held                       / Ask_Stop    >= Stalled,
+      Checking   + Near                       / Ask_Polish  >= Polishing,
       Checking   + Moving            (Capped) / Ask_Stop    >= Exhausted,
       Checking   + Moving                     / Ask_Step    >= Iterating,
+      Polishing  + Passed                     / Ask_Stop    >= Certified,
+      Polishing  + Not_Passed        (Capped) / Ask_Stop    >= Exhausted,
+      Polishing  + Not_Passed                 / Ask_Step    >= Iterating,
       Certifying + Passed                     / Ask_Stop    >= Certified,
       Certifying + Not_Passed        (Capped) / Ask_Stop    >= Exhausted,
       Certifying + Not_Passed                 / Ask_Step    >= Iterating];
@@ -127,6 +135,7 @@ is
          when Admm.Primal_Infeasible => E_Primal_Infeasible,
          when Admm.Dual_Infeasible   => E_Dual_Infeasible,
          when Admm.Held              => E_Held,
+         when Admm.Near              => E_Near,
          when Admm.Moving            => E_Moving);
 
    --  The iterate, and the iterate at the last check.
@@ -148,30 +157,35 @@ is
    with Pre => Fits_Work (Pr, Work) and then It.N = Pr.N and then It.K = Pr.K
    is
       Ok      : Boolean;
+      Passed  : Boolean;
       Setup   : Admm.Prepare_Result;
       Verdict : Admm.Verdict;
    begin
       case Ctx.Request is
-         when Prepare     =>
+         when Prepare       =>
             Admm.Prepare (Pr, S, Work, Setup);
             Ctx.Found := Prepared (Setup);
 
-         when Step        =>
+         when Step          =>
             Admm.Iterate (Pr, S, Work, It.Now, Ok);
             Ctx.Found := (if Ok then E_Stepped else E_Out_Of_Range);
             Ctx.Iterations := It.Now.Iterations;
 
-         when Check       =>
+         when Check         =>
             Admm.Check (Pr, S, It.Now, It.Last, Verdict);
             Ctx.Found := Checked (Verdict);
 
-         when Certify     =>
+         when Engine.Polish =>
+            Qp.Polish.Run (Pr, S, Work, It.Now, Passed);
+            Ctx.Found := (if Passed then E_Passed else E_Not_Passed);
+
+         when Certify       =>
             Ctx.Found :=
               (if Certificate.Certified (Pr, It.Now, S.Tol)
                then E_Passed
                else E_Not_Passed);
 
-         when Engine.Stop =>
+         when Engine.Stop   =>
             Ctx.Found := E_Not_Passed;
       end case;
    end Run;
@@ -192,7 +206,8 @@ is
          Max_Iter    => S.Max_Iter,
          Check_Every => S.Check_Every);
    begin
-      --  Each iteration takes at most a step, a check and a certificate.
+      --  Each iteration takes at most a step, a check, and a certificate
+      --  or a polish.
       for Turn in 1 .. 3 * S.Max_Iter + 1 loop
          exit when Current in Final or else Ctx.Request = Stop;
          Run (Pr, S, Work, It, Ctx);

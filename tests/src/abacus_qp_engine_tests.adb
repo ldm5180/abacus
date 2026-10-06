@@ -198,19 +198,44 @@ package body Abacus_Qp_Engine_Tests is
       Assert (R.Result = Certified and then R.Worst <= Millionth, Report (R));
    end Test_Spread;
 
-   --  The tail-mean linear program is not certified:
-   --  ADMM, like OSQP (which runs to 400,000 iterations on it), creeps
-   --  at residuals near 1e-6, so the cap is reached.  What holds is that
-   --  it is reported as such, never as certified, and that the weights
-   --  are within a thousandth of the simplex's.
+   --  The tail-mean linear program with its threshold and shortfalls
+   --  unbounded: ADMM alone creeps near 1e-6, and the polish certifies
+   --  it within a millionth of the simplex's answer.
    procedure Test_Tail (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      R : constant Fixture_Run := Run_Fixture ("tail", Default_Settings);
+   begin
+      Assert (R.Result = Certified and then R.Worst <= Millionth, Report (R));
+   end Test_Tail;
+
+   --  Without the polish it is not certified: ADMM, like OSQP (which runs
+   --  to 400,000 iterations on it), creeps at residuals near 1e-6, so the
+   --  cap is reached.  What holds is that it is reported as such, never
+   --  as certified, and that the weights are within a thousandth of the
+   --  simplex's.
+   procedure Test_Tail_Unpolished (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
       pragma Unreferenced (T);
       Thousandth : constant := One / 1_000;
       R          : constant Fixture_Run :=
-        Run_Fixture ("tail", (Default_Settings with delta Max_Iter => 40_000));
+        Run_Fixture
+          ("tail",
+           (Default_Settings
+            with delta Max_Iter => 40_000, Polish_Every => 0));
    begin
       Assert (R.Result = Exhausted and then R.Worst <= Thousandth, Report (R));
-   end Test_Tail;
+   end Test_Tail_Unpolished;
+
+   --  The tail-mean linear program with its threshold and shortfalls
+   --  boxed by the data, as a caller who knows them poses it: certified,
+   --  within a millionth of the simplex's answer.
+   procedure Test_Tail_Bounded (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      R : constant Fixture_Run :=
+        Run_Fixture ("tail_bounded", Default_Settings);
+   begin
+      Assert (R.Result = Certified and then R.Worst <= Millionth, Report (R));
+   end Test_Tail_Bounded;
 
    procedure Test_Fixture_Refusals
      (T : in out AUnit.Test_Cases.Test_Case'Class)
@@ -240,6 +265,10 @@ package body Abacus_Qp_Engine_Tests is
       Register_Routine (T, Test_Warm'Access, "A warm start");
       Register_Routine (T, Test_Spread'Access, "The spread fixture");
       Register_Routine (T, Test_Tail'Access, "The tail-mean linear program");
+      Register_Routine
+        (T, Test_Tail_Unpolished'Access, "The tail-mean program, unpolished");
+      Register_Routine
+        (T, Test_Tail_Bounded'Access, "The tail-mean program, boxed");
       Register_Routine
         (T,
          Test_Fixture_Refusals'Access,

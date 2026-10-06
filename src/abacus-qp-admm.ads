@@ -44,12 +44,15 @@ is
    --  What a check between iterations found: the residuals within
    --  tolerance; the duals' change certifying no x meets the bounds; the
    --  iterate's change certifying the objective falls without end; the
-   --  iterate the same as at the last check; or still moving.
+   --  iterate the same as at the last check; still moving, but near
+   --  enough that a polish is due (Settings.Polish_Every and
+   --  Polish_Below); or still moving.
    type Verdict is
-     (Converged, Primal_Infeasible, Dual_Infeasible, Held, Moving);
+     (Converged, Primal_Infeasible, Dual_Infeasible, Held, Near, Moving);
 
    --  St checked against the tolerances and against Last, the state at
-   --  the last check; Last becomes St when it is still moving.
+   --  the last check; Last becomes St when it is still moving, near or
+   --  not.
    procedure Check
      (Pr   : Problem;
       S    : Settings;

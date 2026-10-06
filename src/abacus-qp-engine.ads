@@ -1,7 +1,8 @@
 with Abacus.Qp.Certificate;
 
 --  The solver's loop, an sml machine: it decides what to do next --
---  prepare, iterate, check, certify -- from what the last request found,
+--  prepare, iterate, check, polish, certify -- from what the last
+--  request found,
 --  and Solve carries the requests out.  The iteration cap bounds the
 --  loop, so a solve ends; a Certified outcome is held to its
 --  certificate by Solve's postcondition.
@@ -11,7 +12,7 @@ package Abacus.Qp.Engine
 is
 
    --  What the loop asks for next.
-   type Command is (Prepare, Step, Check, Certify, Stop);
+   type Command is (Prepare, Step, Check, Polish, Certify, Stop);
 
    --  The machine's states: one per request it waits on, and one per
    --  outcome.
@@ -19,6 +20,7 @@ is
      (Preparing,
       Iterating,
       Checking,
+      Polishing,
       Certifying,
       Certified,
       Infeasible,
@@ -31,7 +33,8 @@ is
    subtype Final is Phase range Certified .. Diverged;
 
    --  What a request found, posted back to the machine: P is not
-   --  positive semidefinite (Indefinite), the certificate passed or not.
+   --  positive semidefinite (Indefinite), the iterate near enough to
+   --  polish, the certificate passed or not.
    type Event_Kind is
      (E_Ready,
       E_Indefinite,
@@ -41,6 +44,7 @@ is
       E_Primal_Infeasible,
       E_Dual_Infeasible,
       E_Held,
+      E_Near,
       E_Moving,
       E_Passed,
       E_Not_Passed);

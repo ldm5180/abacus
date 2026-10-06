@@ -49,6 +49,7 @@ package body Abacus_Steps.Qp is
       A_Solve_Warm,
       A_Load,
       A_Solve_Fixture,
+      A_Solve_Unpolished,
       A_Check_Outcome,
       A_Check_Each,
       A_Check_Variable,
@@ -172,7 +173,8 @@ package body Abacus_Steps.Qp is
 
    --  The fixtures tools/make_qp.py wrote.
    function Is_Fixture (Name : String) return Boolean
-   is (Name in "spread" | "tail" | "infeasible" | "nonconvex");
+   is (Name
+       in "spread" | "tail" | "tail_bounded" | "infeasible" | "nonconvex");
 
    function Fixture_Name (G : Program) return String
    is (G.Fixture (1 .. G.Named));
@@ -200,12 +202,12 @@ package body Abacus_Steps.Qp is
       return Worst;
    end Gap_To_Oracle;
 
-   procedure Solve_Fixture (G : in out Program) is
+   procedure Solve_Fixture (G : in out Program; S : Settings) is
       Pr   : constant Problem := Abacus_Qp_Fixtures.Load (Fixture_Name (G));
       Work : Workspace (Pr.N, Pr.K);
       St   : State := Cold (Pr.N, Pr.K);
    begin
-      Engine.Solve (Pr, Default_Settings, Work, St, G.Result);
+      Engine.Solve (Pr, S, Work, St, G.Result);
       G.Iterations := St.Iterations;
       G.Worst := Gap_To_Oracle (Fixture_Name (G), St.X);
       G.Held := 0;
@@ -364,6 +366,7 @@ package body Abacus_Steps.Qp is
            "a problem has 1 to"
            & Max_Variables'Image
            & " variables, or is one of the fixtures: spread, tail,"
+           & " tail_bounded,"
            & " infeasible, nonconvex",
          when A_Refuse_Part        =>
            "a bound or a total is a decimal number, a variable one of the"
@@ -385,31 +388,36 @@ package body Abacus_Steps.Qp is
       pragma Unreferenced (Evt);
    begin
       case A is
-         when A_Nothing       =>
+         when A_Nothing          =>
             null;
 
-         when Pose_Action     =>
+         when Pose_Action        =>
             Pose_Part (A, Ctx);
 
-         when A_Solve         =>
+         when A_Solve            =>
             Solve (Ctx.W.Qp, Warm => False);
             Then_Take (Ctx, E_Qp_Settled);
 
-         when A_Solve_Warm    =>
+         when A_Solve_Warm       =>
             Solve_Warm (Ctx);
             Then_Take (Ctx, E_Qp_Settled);
 
-         when A_Load          =>
+         when A_Load             =>
             Load (Ctx);
 
-         when A_Solve_Fixture =>
-            Solve_Fixture (Ctx.W.Qp);
+         when A_Solve_Fixture    =>
+            Solve_Fixture (Ctx.W.Qp, Default_Settings);
             Then_Take (Ctx, E_Qp_Settled);
 
-         when Check_Action    =>
+         when A_Solve_Unpolished =>
+            Solve_Fixture
+              (Ctx.W.Qp, (Default_Settings with delta Polish_Every => 0));
+            Then_Take (Ctx, E_Qp_Settled);
+
+         when Check_Action       =>
             Check (A, Ctx);
 
-         when Refuse_Action   =>
+         when Refuse_Action      =>
             Fabula.Check.Fail_Step (Ctx.R, Refusal (A, Ctx));
       end case;
    end Execute;
@@ -427,26 +435,27 @@ package body Abacus_Steps.Qp is
    use Flow.Machines;
    use Flow.Op;
 
-   Pose_Identity   : constant Ev := (Kind => E_Pose_Identity);
-   Pose_Linear     : constant Ev := (Kind => E_Pose_Linear);
-   Pose_Diagonal   : constant Ev := (Kind => E_Pose_Diagonal);
-   Bound_All       : constant Ev := (Kind => E_Bound_All);
-   Bound_Upper     : constant Ev := (Kind => E_Bound_Upper);
-   Open_Upper      : constant Ev := (Kind => E_Open_Upper);
-   Give_Objective  : constant Ev := (Kind => E_Give_Objective);
-   Sum_Exactly     : constant Ev := (Kind => E_Sum_Exactly);
-   Sum_At_Most     : constant Ev := (Kind => E_Sum_At_Most);
-   Solve_Qp        : constant Ev := (Kind => E_Solve_Qp);
-   Solve_Warm_Ev   : constant Ev := (Kind => E_Solve_Warm);
-   Qp_Settled      : constant Ev := (Kind => E_Qp_Settled);
-   Check_Certified : constant Ev := (Kind => E_Check_Certified);
-   Check_Outcome   : constant Ev := (Kind => E_Check_Outcome);
-   Check_Each      : constant Ev := (Kind => E_Check_Each);
-   Check_Variable  : constant Ev := (Kind => E_Check_Variable);
-   Check_Fewer     : constant Ev := (Kind => E_Check_Fewer);
-   Load_Fixture    : constant Ev := (Kind => E_Load_Fixture);
-   Check_Oracle    : constant Ev := (Kind => E_Check_Oracle);
-   Check_Held      : constant Ev := (Kind => E_Check_Held);
+   Pose_Identity    : constant Ev := (Kind => E_Pose_Identity);
+   Pose_Linear      : constant Ev := (Kind => E_Pose_Linear);
+   Pose_Diagonal    : constant Ev := (Kind => E_Pose_Diagonal);
+   Bound_All        : constant Ev := (Kind => E_Bound_All);
+   Bound_Upper      : constant Ev := (Kind => E_Bound_Upper);
+   Open_Upper       : constant Ev := (Kind => E_Open_Upper);
+   Give_Objective   : constant Ev := (Kind => E_Give_Objective);
+   Sum_Exactly      : constant Ev := (Kind => E_Sum_Exactly);
+   Sum_At_Most      : constant Ev := (Kind => E_Sum_At_Most);
+   Solve_Qp         : constant Ev := (Kind => E_Solve_Qp);
+   Solve_Warm_Ev    : constant Ev := (Kind => E_Solve_Warm);
+   Solve_Unpolished : constant Ev := (Kind => E_Solve_Unpolished);
+   Qp_Settled       : constant Ev := (Kind => E_Qp_Settled);
+   Check_Certified  : constant Ev := (Kind => E_Check_Certified);
+   Check_Outcome    : constant Ev := (Kind => E_Check_Outcome);
+   Check_Each       : constant Ev := (Kind => E_Check_Each);
+   Check_Variable   : constant Ev := (Kind => E_Check_Variable);
+   Check_Fewer      : constant Ev := (Kind => E_Check_Fewer);
+   Load_Fixture     : constant Ev := (Kind => E_Load_Fixture);
+   Check_Oracle     : constant Ev := (Kind => E_Check_Oracle);
+   Check_Held       : constant Ev := (Kind => E_Check_Held);
 
    --!format off
    Table : constant Transition_Table :=
@@ -459,6 +468,7 @@ package body Abacus_Steps.Qp is
       Empty    + Load_Fixture    (Fixture_Read)        / A_Load               >= Loaded,
       Empty    + Load_Fixture                          / A_Refuse_Pose        >= Empty,
       Loaded   + Solve_Qp                              / A_Solve_Fixture      >= Settling,
+      Loaded   + Solve_Unpolished                      / A_Solve_Unpolished   >= Settling,
       Empty    + Solve_Qp                              / A_Refuse_Unposed     >= Empty,
       Empty    + Check_Certified                       / A_Refuse_Unposed     >= Empty,
       Posed    + Bound_All       (Bounds_Read)         / A_Bound_All          >= Posed,

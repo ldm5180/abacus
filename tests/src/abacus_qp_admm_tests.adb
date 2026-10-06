@@ -60,12 +60,45 @@ package body Abacus_Qp_Admm_Tests is
       Assert (V in Converged | Held, "the same state twice");
    end Test_Iterate;
 
+   --  A check that finds the iterate moving says it is near enough to
+   --  polish when its residuals are within Polish_Below and the polish
+   --  is due; never when Polish_Every is zero.
+   procedure Test_Near (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Pr     : constant Problem := Two (Hi => One);
+      Work   : Workspace (2, 1);
+      Result : Prepare_Result;
+      St     : State := Cold (2, 1);
+      Last   : State := St;
+      Ok     : Boolean;
+      V      : Verdict;
+      Loose  : constant Settings :=
+        (Default_Settings with delta Polish_Every => 5, Polish_Below => One);
+   begin
+      Prepare (Pr, Default_Settings, Work, Result);
+      for K in 1 .. 5 loop
+         Iterate (Pr, Default_Settings, Work, St, Ok);
+      end loop;
+      Check (Pr, Loose, St, Last, V);
+      Assert (V = Near and then Last = St, "near, and kept");
+      Last := Cold (2, 1);
+      Check (Pr, (Loose with delta Polish_Every => 0), St, Last, V);
+      Assert (V = Moving, "no polish asked for");
+      Last := Cold (2, 1);
+      Check (Pr, (Loose with delta Polish_Every => 3), St, Last, V);
+      Assert (V = Moving, "not due");
+      Last := Cold (2, 1);
+      Check (Pr, (Loose with delta Polish_Below => 0), St, Last, V);
+      Assert (V = Moving, "not near");
+   end Test_Near;
+
    overriding
    procedure Register_Tests (T : in out Test) is
       use AUnit.Test_Cases.Registration;
    begin
       Register_Routine (T, Test_Prepare'Access, "Prepare");
       Register_Routine (T, Test_Iterate'Access, "Iterate and check");
+      Register_Routine (T, Test_Near'Access, "Near enough to polish");
    end Register_Tests;
 
    overriding

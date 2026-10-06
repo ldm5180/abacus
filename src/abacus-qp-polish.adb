@@ -49,7 +49,8 @@ is
    end Read_Held;
 
    ---------------------------------------------------------------------
-   --  The systems the polish solves with.
+   --  The systems the polish solves with, packed: free variable Q is
+   --  Free_At (Q), held row P is Row_At (P).
    ---------------------------------------------------------------------
 
    function Is_Free (Work : Workspace; I : Index) return Boolean
@@ -60,16 +61,58 @@ is
    is (Work.Row_Side (R) /= Free)
    with Pre => R <= Work.K;
 
-   --  A: E's held rows over the free columns, zero elsewhere.
-   procedure Form_A (Pr : Problem; Work : in out Workspace)
-   with Pre => Fits_Work (Pr, Work)
+   --  Whether Work's maps name places of Pr.
+   function Packed (Pr : Problem; Work : Workspace) return Boolean
+   is (Fits_Work (Pr, Work)
+       and then Work.Free_Count <= Pr.N
+       and then Work.Row_Count <= Pr.K
+       and then (for all Q in 1 .. Work.Free_Count => Work.Free_At (Q) <= Pr.N)
+       and then (for all P in 1 .. Work.Row_Count => Work.Row_At (P) <= Pr.K));
+
+   --  The free variables in order, then the held rows.
+   procedure Pack (Pr : Problem; Work : in out Workspace)
+   with Pre => Fits_Work (Pr, Work), Post => Packed (Pr, Work)
    is
    begin
+      Work.Free_Count := 0;
+      for I in 1 .. Pr.N loop
+         if Is_Free (Work, I) then
+            Work.Free_Count := Work.Free_Count + 1;
+            Work.Free_At (Work.Free_Count) := I;
+         end if;
+         pragma Loop_Invariant (Work.Free_Count <= I);
+         pragma
+           Loop_Invariant
+             (for all Q in 1 .. Work.Free_Count => Work.Free_At (Q) <= I);
+      end loop;
+      Work.Row_Count := 0;
       for R in 1 .. Pr.K loop
-         for J in 1 .. Pr.N loop
-            Work.A (R, J) :=
-              (if Is_Held_Row (Work, R) and then Is_Free (Work, J)
-               then Pr.E (R, J)
+         if Is_Held_Row (Work, R) then
+            Work.Row_Count := Work.Row_Count + 1;
+            Work.Row_At (Work.Row_Count) := R;
+         end if;
+         pragma Loop_Invariant (Work.Free_Count <= Pr.N);
+         pragma
+           Loop_Invariant
+             (for all Q in 1 .. Work.Free_Count => Work.Free_At (Q) <= Pr.N);
+         pragma Loop_Invariant (Work.Row_Count <= R);
+         pragma
+           Loop_Invariant
+             (for all P in 1 .. Work.Row_Count => Work.Row_At (P) <= R);
+      end loop;
+   end Pack;
+
+   --  A (P, Q) = E (Row_At (P), Free_At (Q)) over the free columns; the
+   --  rows past the held ones zero.
+   procedure Form_A (Pr : Problem; Work : in out Workspace)
+   with Pre => Packed (Pr, Work), Post => Packed (Pr, Work)
+   is
+   begin
+      for P in 1 .. Pr.K loop
+         for Q in 1 .. Work.Free_Count loop
+            Work.A (P, Q) :=
+              (if P <= Work.Row_Count
+               then Pr.E (Work.Row_At (P), Work.Free_At (Q))
                else 0);
          end loop;
       end loop;
@@ -79,59 +122,51 @@ is
    function Free_Entry
      (Pr : Problem; Work : Workspace; I, J : Index) return Wide
    is (Round_Shift (Column_Dot (Work.A, I, J))
-       + Scaled (Pr.P (I, J), -Delta_Shift)
+       + Scaled (Pr.P (Work.Free_At (I), Work.Free_At (J)), -Delta_Shift)
        + (if I = J then Delta_Squared else 0))
-   with Pre => Fits_Work (Pr, Work) and then I <= Pr.N and then J <= Pr.N;
+   with
+     Pre =>
+       Packed (Pr, Work)
+       and then I <= Work.Free_Count
+       and then J <= Work.Free_Count;
 
-   --  Entry (R, Q) of A A' + delta**2 I.
-   function Row_Entry (Work : Workspace; R, Q : Index) return Wide
-   is (Round_Shift (Row_Dot (Work.A, R, Q, 1, Work.N))
-       + (if R = Q then Delta_Squared else 0))
-   with Pre => R <= Work.K and then Q <= Work.K;
+   --  Entry (P, R) of A A' + delta**2 I.
+   function Row_Entry (Work : Workspace; P, R : Index) return Wide
+   is (Round_Shift (Row_Dot (Work.A, P, R, 1, Work.Free_Count))
+       + (if P = R then Delta_Squared else 0))
+   with
+     Pre =>
+       P <= Work.K and then R <= Work.K and then Work.Free_Count <= Work.N;
 
-   --  The identity's entry (I, J).
-   function Identity (I, J : Index) return Val
-   is (if I = J then One else 0);
-
-   --  A'A + delta P + delta**2 I over the free variables, the identity
-   --  over the held ones, factored into S.
+   --  A'A + delta P + delta**2 I, factored into S's leading block.
    procedure Form_S
      (Pr : Problem; Work : in out Workspace; Ok : in out Boolean)
-   with Pre => Fits_Work (Pr, Work)
+   with Pre => Packed (Pr, Work), Post => Packed (Pr, Work)
    is
       Outcome : Cholesky.Factor_Outcome;
    begin
-      for I in 1 .. Pr.N loop
+      for I in 1 .. Work.Free_Count loop
          for J in 1 .. I loop
-            if Is_Free (Work, I) and then Is_Free (Work, J) then
-               Store (Free_Entry (Pr, Work, I, J), Work.S (I, J), Ok);
-            else
-               Work.S (I, J) := Identity (I, J);
-            end if;
+            Store (Free_Entry (Pr, Work, I, J), Work.S (I, J), Ok);
          end loop;
       end loop;
-      Cholesky.Factor (Work.S, Work.S_D, 1, Outcome);
+      Cholesky.Factor_Leading (Work.S, Work.S_D, Work.Free_Count, 1, Outcome);
       Ok := Ok and then Outcome.Result = Cholesky.Factored;
    end Form_S;
 
-   --  A A' + delta**2 I over the held rows, the identity over the free
-   --  ones, factored into G.
+   --  A A' + delta**2 I, factored into G's leading block.
    procedure Form_G
      (Pr : Problem; Work : in out Workspace; Ok : in out Boolean)
-   with Pre => Fits_Work (Pr, Work)
+   with Pre => Packed (Pr, Work), Post => Packed (Pr, Work)
    is
       Outcome : Cholesky.Factor_Outcome;
    begin
-      for R in 1 .. Pr.K loop
-         for Q in 1 .. R loop
-            if Is_Held_Row (Work, R) and then Is_Held_Row (Work, Q) then
-               Store (Row_Entry (Work, R, Q), Work.G (R, Q), Ok);
-            else
-               Work.G (R, Q) := Identity (R, Q);
-            end if;
+      for P in 1 .. Work.Row_Count loop
+         for R in 1 .. P loop
+            Store (Row_Entry (Work, P, R), Work.G (P, R), Ok);
          end loop;
       end loop;
-      Cholesky.Factor (Work.G, Work.G_D, 1, Outcome);
+      Cholesky.Factor_Leading (Work.G, Work.G_D, Work.Row_Count, 1, Outcome);
       Ok := Ok and then Outcome.Result = Cholesky.Factored;
    end Form_G;
 
@@ -139,14 +174,34 @@ is
    --  The free variables and the held rows' multipliers.
    ---------------------------------------------------------------------
 
+   --  The packed vectors a solve works with: the held rows' multipliers
+   --  (Lam) and gaps, and the step a refinement takes over the free
+   --  variables.
+   type Packed_Vectors
+     (N : Index;
+      K : Count)
+   is record
+      Lam  : Vector (1 .. K);
+      Gap  : Vector (1 .. K);
+      Step : Vector (1 .. N);
+   end record;
+
+   function Fits_Vectors (Pr : Problem; C : Packed_Vectors) return Boolean
+   is (C.N = Pr.N and then C.K = Pr.K);
+
    --  From's x with each held variable at its bound, and From's
-   --  multipliers on the held rows.
+   --  multipliers on the held rows, packed.
    procedure Start
-     (Pr : Problem; Work : Workspace; From : State; Cand : out State)
+     (Pr   : Problem;
+      Work : Workspace;
+      From : State;
+      C    : in out Packed_Vectors;
+      Cand : out State)
    with
      Pre =>
-       Fits_Work (Pr, Work)
+       Packed (Pr, Work)
        and then Fits_State (Pr, From)
+       and then Fits_Vectors (Pr, C)
        and then Cand.N = Pr.N
        and then Cand.K = Pr.K
    is
@@ -159,33 +214,30 @@ is
             then From.X (I)
             else Bound_Of (Work.Box_Side (I), Pr.Lo (I), Pr.Hi (I)));
       end loop;
-      for R in 1 .. Pr.K loop
-         Cand.Y_Row (R) :=
-           (if Is_Held_Row (Work, R) then From.Y_Row (R) else 0);
+      C.Lam := [others => 0];
+      for P in 1 .. Work.Row_Count loop
+         C.Lam (P) := From.Y_Row (Work.Row_At (P));
       end loop;
    end Start;
 
-   --  A refinement's working vectors: the held rows' gaps, and the step
-   --  the refinement takes.
-   type Correction
-     (N : Index;
-      K : Count)
-   is record
-      Row_Gap : Vector (1 .. K);
-      Step    : Vector (1 .. N);
-   end record;
-
-   --  -(P x + q + A'lambda) at a free variable I.
+   --  -(P x + q + A'lambda) at free variable Q.
    function Stationarity
-     (Pr : Problem; Work : Workspace; Cand : State; I : Index) return Wide
-   is (-(Round_Shift (Row_Vector_Dot (Pr.P, I, Cand.X, 1, Pr.N))
-         + Wide (Pr.Q (I))
-         + Round_Shift (Column_Vector_Dot (Work.A, I, Cand.Y_Row))))
+     (Pr   : Problem;
+      Work : Workspace;
+      Cand : State;
+      C    : Packed_Vectors;
+      Q    : Index) return Wide
+   is (-(Round_Shift (Row_Vector_Dot (Pr.P, Work.Free_At (Q), Cand.X, 1, Pr.N))
+         + Wide (Pr.Q (Work.Free_At (Q)))
+         + Round_Shift (Column_Vector_Dot (Work.A, Q, C.Lam))))
    with
      Pre =>
-       Fits_Work (Pr, Work) and then Fits_State (Pr, Cand) and then I <= Pr.N;
+       Packed (Pr, Work)
+       and then Fits_State (Pr, Cand)
+       and then Fits_Vectors (Pr, C)
+       and then Q <= Work.Free_Count;
 
-   --  The bound a held row R is held at, less E x.
+   --  The bound row R is held at, less E x.
    function Row_Gap_Of
      (Pr : Problem; Work : Workspace; Cand : State; R : Index) return Wide
    is (Wide (Bound_Of (Work.Row_Side (R), Pr.Row_Lo (R), Pr.Row_Hi (R)))
@@ -200,83 +252,84 @@ is
      (Pr   : Problem;
       Work : Workspace;
       Cand : State;
-      C    : in out Correction;
+      C    : in out Packed_Vectors;
       Ok   : in out Boolean)
    with
      Pre =>
-       Fits_Work (Pr, Work)
+       Packed (Pr, Work)
        and then Fits_State (Pr, Cand)
-       and then C.N = Pr.N
-       and then C.K = Pr.K
+       and then Fits_Vectors (Pr, C)
    is
       Pull : Val := 0;
    begin
-      for R in 1 .. Pr.K loop
-         C.Row_Gap (R) := 0;
-         if Is_Held_Row (Work, R) then
-            Store (Row_Gap_Of (Pr, Work, Cand, R), C.Row_Gap (R), Ok);
-         end if;
+      C.Gap := [others => 0];
+      for P in 1 .. Work.Row_Count loop
+         Store (Row_Gap_Of (Pr, Work, Cand, Work.Row_At (P)), C.Gap (P), Ok);
       end loop;
-      for I in 1 .. Pr.N loop
-         C.Step (I) := 0;
-         if Is_Free (Work, I) then
-            Store (Stationarity (Pr, Work, Cand, I), Pull, Ok);
-            Store
-              (Scaled (Pull, -Delta_Shift)
-               + Round_Shift (Column_Vector_Dot (Work.A, I, C.Row_Gap)),
-               C.Step (I),
-               Ok);
-         end if;
+      C.Step := [others => 0];
+      for Q in 1 .. Work.Free_Count loop
+         Store (Stationarity (Pr, Work, Cand, C, Q), Pull, Ok);
+         Store
+           (Scaled (Pull, -Delta_Shift)
+            + Round_Shift (Column_Vector_Dot (Work.A, Q, C.Gap)),
+            C.Step (Q),
+            Ok);
       end loop;
    end Right_Side;
 
-   --  The step taken: x moves by it, and each held row's multiplier by
-   --  (A step - gap) / delta.
+   --  The step taken: the free variables move by it, and each held row's
+   --  multiplier by (A step - gap) / delta.
    procedure Take_Step
      (Pr   : Problem;
       Work : Workspace;
-      C    : Correction;
+      C    : in out Packed_Vectors;
       Cand : in out State;
       Ok   : in out Boolean)
    with
      Pre =>
-       Fits_Work (Pr, Work)
+       Packed (Pr, Work)
        and then Fits_State (Pr, Cand)
-       and then C.N = Pr.N
-       and then C.K = Pr.K
+       and then Fits_Vectors (Pr, C)
    is
       Change : Val := 0;
    begin
-      for I in 1 .. Pr.N loop
-         Store (Wide (Cand.X (I)) + Wide (C.Step (I)), Cand.X (I), Ok);
+      for Q in 1 .. Work.Free_Count loop
+         Store
+           (Wide (Cand.X (Work.Free_At (Q))) + Wide (C.Step (Q)),
+            Cand.X (Work.Free_At (Q)),
+            Ok);
       end loop;
-      for R in 1 .. Pr.K loop
-         if Is_Held_Row (Work, R) then
-            Store
-              (Round_Shift (Row_Vector_Dot (Work.A, R, C.Step, 1, Pr.N))
-               - Wide (C.Row_Gap (R)),
-               Change,
-               Ok);
-            Store
-              (Wide (Cand.Y_Row (R)) + Scaled (Change, Delta_Shift),
-               Cand.Y_Row (R),
-               Ok);
-         end if;
+      for P in 1 .. Work.Row_Count loop
+         Store
+           (Round_Shift
+              (Row_Vector_Dot (Work.A, P, C.Step, 1, Work.Free_Count))
+            - Wide (C.Gap (P)),
+            Change,
+            Ok);
+         Store
+           (Wide (C.Lam (P)) + Scaled (Change, Delta_Shift), C.Lam (P), Ok);
       end loop;
    end Take_Step;
 
    --  One refinement of x and the held rows' multipliers against the
    --  exact system, solved with the regularized one.
    procedure Refine_X
-     (Pr : Problem; Work : Workspace; Cand : in out State; Ok : in out Boolean)
-   with Pre => Fits_Work (Pr, Work) and then Fits_State (Pr, Cand)
+     (Pr   : Problem;
+      Work : Workspace;
+      C    : in out Packed_Vectors;
+      Cand : in out State;
+      Ok   : in out Boolean)
+   with
+     Pre =>
+       Packed (Pr, Work)
+       and then Fits_State (Pr, Cand)
+       and then Fits_Vectors (Pr, C)
    is
-      C      : Correction (Pr.N, Pr.K) :=
-        (Pr.N, Pr.K, [others => 0], [others => 0]);
       Solved : Cholesky.Solve_Result;
    begin
       Right_Side (Pr, Work, Cand, C, Ok);
-      Cholesky.Solve (Work.S, Work.S_D, C.Step, Solved);
+      Cholesky.Solve_Leading
+        (Work.S, Work.S_D, C.Step, Work.Free_Count, Solved);
       Ok := Ok and then Solved = Cholesky.Solved;
       if Ok then
          Take_Step (Pr, Work, C, Cand, Ok);
@@ -305,18 +358,18 @@ is
    end Gradient;
 
    --  One least-squares refinement of the held rows' multipliers: the
-   --  free variables' residual -(P x + q + A'y_row), brought through A
+   --  free variables' residual -(P x + q + A'lambda), brought through A
    --  and solved with A A'.
    procedure Refine_Y
      (Pr   : Problem;
       Work : Workspace;
       Gr   : Vector;
-      Cand : in out State;
+      C    : in out Packed_Vectors;
       Ok   : in out Boolean)
    with
      Pre =>
-       Fits_Work (Pr, Work)
-       and then Fits_State (Pr, Cand)
+       Packed (Pr, Work)
+       and then Fits_Vectors (Pr, C)
        and then Gr'First = 1
        and then Gr'Last = Pr.N
    is
@@ -324,31 +377,42 @@ is
       Rhs    : Vector (1 .. Pr.K) := [others => 0];
       Solved : Cholesky.Solve_Result;
    begin
-      for I in 1 .. Pr.N loop
-         if Is_Free (Work, I) then
-            Store
-              (-(Wide (Gr (I))
-                 + Round_Shift (Column_Vector_Dot (Work.A, I, Cand.Y_Row))),
-               Res (I),
-               Ok);
-         end if;
+      for Q in 1 .. Work.Free_Count loop
+         Store
+           (-(Wide (Gr (Work.Free_At (Q)))
+              + Round_Shift (Column_Vector_Dot (Work.A, Q, C.Lam))),
+            Res (Q),
+            Ok);
       end loop;
-      for R in 1 .. Pr.K loop
-         if Is_Held_Row (Work, R) then
-            Store
-              (Round_Shift (Row_Vector_Dot (Work.A, R, Res, 1, Pr.N)),
-               Rhs (R),
-               Ok);
-         end if;
+      for P in 1 .. Work.Row_Count loop
+         Store
+           (Round_Shift (Row_Vector_Dot (Work.A, P, Res, 1, Work.Free_Count)),
+            Rhs (P),
+            Ok);
       end loop;
-      Cholesky.Solve (Work.G, Work.G_D, Rhs, Solved);
+      Cholesky.Solve_Leading (Work.G, Work.G_D, Rhs, Work.Row_Count, Solved);
       Ok := Ok and then Solved = Cholesky.Solved;
-      for R in 1 .. Pr.K loop
-         if Ok and then Is_Held_Row (Work, R) then
-            Store (Wide (Cand.Y_Row (R)) + Wide (Rhs (R)), Cand.Y_Row (R), Ok);
-         end if;
+      for P in 1 .. Work.Row_Count loop
+         exit when not Ok;
+         Store (Wide (C.Lam (P)) + Wide (Rhs (P)), C.Lam (P), Ok);
       end loop;
    end Refine_Y;
+
+   --  The held rows' multipliers unpacked into Cand's, zero elsewhere.
+   procedure Unpack (Work : Workspace; C : Packed_Vectors; Cand : in out State)
+   with
+     Pre =>
+       Work.Row_Count <= Work.K
+       and then (for all P in 1 .. Work.Row_Count => Work.Row_At (P) <= Work.K)
+       and then C.K = Work.K
+       and then Cand.K = Work.K
+   is
+   begin
+      Cand.Y_Row := [others => 0];
+      for P in 1 .. Work.Row_Count loop
+         Cand.Y_Row (Work.Row_At (P)) := C.Lam (P);
+      end loop;
+   end Unpack;
 
    --  The held variables' multipliers, -(P x + q + E'y_row), and the
    --  projections z and z_row of x and E x.
@@ -396,21 +460,25 @@ is
       Ok   : out Boolean)
    is
       Gr : Vector (1 .. Pr.N);
+      C  : Packed_Vectors (Pr.N, Pr.K) :=
+        (Pr.N, Pr.K, [others => 0], [others => 0], [others => 0]);
    begin
       Ok := True;
+      Pack (Pr, Work);
       Form_A (Pr, Work);
       Form_S (Pr, Work, Ok);
-      Start (Pr, Work, From, Cand);
+      Start (Pr, Work, From, C, Cand);
       for K in 1 .. X_Refinements loop
          exit when not Ok;
-         Refine_X (Pr, Work, Cand, Ok);
+         Refine_X (Pr, Work, C, Cand, Ok);
       end loop;
       Form_G (Pr, Work, Ok);
       Gradient (Pr, Cand, Gr, Ok);
       for K in 1 .. Y_Refinements loop
          exit when not Ok;
-         Refine_Y (Pr, Work, Gr, Cand, Ok);
+         Refine_Y (Pr, Work, Gr, C, Ok);
       end loop;
+      Unpack (Work, C, Cand);
       Settle (Pr, Work, Gr, Cand, Ok);
    end Solve_Held;
 
