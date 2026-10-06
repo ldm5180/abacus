@@ -4,6 +4,8 @@ with Abacus.Elementary;
 with Abacus.Ieee;
 with Abacus.Quantities;
 with Abacus.Sorting;
+with Abacus.Stats;
+with Abacus.Stats.Rolling;
 with Abacus.Text;
 with Abacus.Vectors;
 

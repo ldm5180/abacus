@@ -46,7 +46,17 @@ package Abacus_Steps is
       E_Check_Within,
       E_Give_Data,
       E_Take_Quantile,
-      E_Check_Answer);
+      E_Check_Answer,
+      E_Give_Weights,
+      E_Give_Second,
+      E_Compute,
+      E_Check_Near,
+      E_Open_Window,
+      E_Give_Rows,
+      E_Add_Row,
+      E_Remove_Oldest,
+      E_Check_Fresh,
+      E_Check_Fresh_Covariance);
 
    type Hook_Kind is (Fresh_World);
 
@@ -84,11 +94,38 @@ package Abacus_Steps is
 
    subtype Data_Count is Natural range 0 .. Max_Data;
 
-   --  The data stats.feature holds, and the answer it took of them.
+   --  The most series and rows a window in stats.feature holds, and the
+   --  most rows it adds or removes in all.
+   Max_Series : constant := 8;
+   Max_Rows   : constant := 16;
+
+   subtype Series_Count is Natural range 0 .. Max_Series;
+   subtype Row_Count is Natural range 0 .. Max_Rows;
+
+   type Row_Table is array (1 .. Max_Rows) of Abacus.Vector (1 .. Max_Series);
+
+   --  What a window has been through: its series, every row it was given
+   --  in order, and how many of the oldest have been removed.  A step
+   --  replays it, so the slid window is built the way a caller builds
+   --  one.
+   type Window_Log is record
+      Series  : Series_Count := 0;
+      Rows    : Row_Table := [others => [others => 0]];
+      Given   : Row_Count := 0;
+      Removed : Row_Count := 0;
+   end record;
+
+   --  The data stats.feature holds, the weights and a second series
+   --  beside them, the answer it took of them, and its window.
    type Table is record
-      Data   : Abacus.Vector (1 .. Max_Data) := [others => 0];
-      Count  : Data_Count := 0;
-      Answer : Abacus.Val := 0;
+      Data    : Abacus.Vector (1 .. Max_Data) := [others => 0];
+      Count   : Data_Count := 0;
+      Weights : Abacus.Vector (1 .. Max_Data) := [others => 0];
+      Weighed : Data_Count := 0;
+      Second  : Abacus.Vector (1 .. Max_Data) := [others => 0];
+      Paired  : Data_Count := 0;
+      Answer  : Abacus.Val := 0;
+      Window  : Window_Log;
    end record;
 
    --  What one scenario holds.  fabula copies it per step, so it holds
@@ -205,7 +242,20 @@ package Abacus_Steps is
       Step ("the data {}")                   >= E_Give_Data,
       Step ("the {word} quantile is taken by the {word} rule")
                                              >= E_Take_Quantile,
-      Step ("the answer is {word}")          >= E_Check_Answer];
+      Step ("the answer is {word}")          >= E_Check_Answer,
+      Step ("the weights {}")                >= E_Give_Weights,
+      Step ("the second series {}")          >= E_Give_Second,
+      Step ("the {} is computed")            >= E_Compute,
+      Step ("the answer is within {word} of {word}")
+                                             >= E_Check_Near,
+      Step ("a window over {int} series")    >= E_Open_Window,
+      Step ("the rows {}")                   >= E_Give_Rows,
+      Step ("the row {} is added")           >= E_Add_Row,
+      Step ("the oldest row is removed")     >= E_Remove_Oldest,
+      Step ("the window's sums equal a fresh window's over its rows")
+                                             >= E_Check_Fresh,
+      Step ("the sample covariance of series {int} and {int} is the fresh one's")
+                                             >= E_Check_Fresh_Covariance];
    --!format on
 
    Hook_Defs : constant Steps.Hook_Table := [Before >= Fresh_World];
