@@ -1,9 +1,12 @@
 # abacus plan
 
 **Status (2026-10-06):** S0 done on branch `spike` (`spike/`):
-**go**, with scaled 64-bit integers at `Frac = 40` (section 2).  A1
-onward not started.  Three iterations of the plan, then S0's note (see
-Revision notes).
+**go**, with scaled 64-bit integers at `Frac = 40` (section 2).  A1-A12
+built on `main`, every unit proved at level 2 with no assumption, the
+seven features green in both modes.  One open risk for statera: plain
+ADMM does not certify the tail-mean (CVaR-shaped) linear program (A10's
+note).  Three iterations of the plan, S0's note, then the
+implementation's (see Revision notes).
 
 abacus is fixed-point numerics for Ada 2022, proved in SPARK:
 arithmetic on scaled integers, text and IEEE conversion, elementary
@@ -300,6 +303,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
 - **RED first:** `make features` has no rule; then one undefined
   step in `arithmetic.feature`.
 - **Gates:** `make ci`.
+- **Done:** crate, gprs, Makefile (with `shape`, the fructus shape lint adapted, and a comment-blind `no-float`), CI, the Flows runner, CLAUDE.md, MIT license.
 
 ### A2 -- Arithmetic with outcomes
 
@@ -326,6 +330,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
 - **RED first:** `Abacus_Arith_Tests.Test_Half_Times_Half`:
   `Mul (One / 2, One / 2) = One / 4`.  Fails to compile.
 - **Gates:** `make ci`, `make prove`.
+- **Done:** `Abacus` (with `Val`, `Vector`, `Matrix`), `Abacus.Arith` (`Div_Round` the one rounding, `Mul`, `Div`, `Mul_Sat`, `Div_Sat`, `Store`, `Powers_Of_Two`), `Abacus.Quantities` (a generic over a range), arithmetic.feature.
 
 ### A3 -- Decimal text
 
@@ -344,6 +349,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
 - **RED first:** `text.feature`, "0.2621 reads and writes back as
   0.2621".
 - **Gates:** `make ci`, `make prove`.
+- **Done:** `Abacus.Text` with its sml scanner `Abacus.Text.Scanner`; exact rounding of any length of fraction; `Image` at the fewest places up to 20; text.feature.
 
 ### A4 -- IEEE bit patterns
 
@@ -360,6 +366,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
   Subnormals and zero are `Ok`.
 - **RED first:** `ieee.feature`, "The bits of -120.0 read as -120".
 - **Gates:** `make ci`, `make prove`.
+- **Done:** `Abacus.Ieee`; ieee.feature.
 
 ### A5 -- Elementary functions
 
@@ -378,6 +385,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
 - **RED first:** `elementary.feature`, "The square root of 2,
   squared, is 2 to the grid".
 - **Gates:** `make ci`, `make prove`.
+- **Done:** `Abacus.Elementary`: `Root`, `Sqrt`, `Exp`, `Log`, `Norm_Cdf`, `Inv_Norm_Cdf` (AS 241); `tools/make_elementary.py`; elementary.feature.
 
 ### A6 -- Vectors
 
@@ -394,6 +402,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
   dot product and the same with both vectors reversed are equal,
   exactly, for 4,096 seeded elements.
 - **Gates:** `make ci`, `make prove`.
+- **Done:** `Abacus.Vectors`.
 
 ### A7 -- Sorting and quantiles
 
@@ -408,6 +417,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
 - **RED first:** `stats.feature`, "The median of 1, 2, 3, 4 by the
   nearest rule is 3".
 - **Gates:** `make ci`, `make prove`.
+- **Done:** `Abacus.Sorting`: insertion over an order array, proved a sorted permutation in the order value, key, place.
 
 ### A8 -- Statistics
 
@@ -426,6 +436,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
 - **RED first:** `stats.feature`, "A slid window equals a fresh
   one".
 - **Gates:** `make ci`, `make prove`.
+- **Done:** `Abacus.Stats` (with the spike's `Standardize` and `Correlate`) and `Abacus.Stats.Rolling`; stats.feature.
 
 ### A9 -- Matrices and Cholesky
 
@@ -445,6 +456,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
 - **RED first:** `cholesky.feature`, "A matrix with a repeated
   column is refused, and the column is named".
 - **Gates:** `make ci`, `make prove`.
+- **Done:** `Abacus.Matrices` (the spike's kernels, inlined) and `Abacus.Cholesky` (with `Least_Squares`); cholesky.feature.
 
 ### A10 -- The QP solver
 
@@ -510,6 +522,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
       Then the outcome is infeasible
   ```
 - **Gates:** `make ci`, `make prove`.
+- **Done:** `Abacus.Qp`, `Abacus.Qp.Admm`, `Abacus.Qp.Certificate`, `Abacus.Qp.Engine`; `tools/make_qp.py` and its fixtures; qp.feature.
 
 ### A11 -- A seeded generator
 
@@ -521,6 +534,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
   explicit state and seed; `Next`, and `Below (N)` without bias.
 - **RED first:** `Abacus_Random_Tests.Test_Same_Seed_Same_Stream`.
 - **Gates:** `make ci`, `make prove`.
+- **Done:** `Abacus.Random` (SplitMix64).
 
 ### A12 -- Benchmarks and documents
 
@@ -534,6 +548,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
   what is and is not proved.
 - **RED first:** `make bench` has no rule.
 - **Gates:** `make ci`.
+- **Done:** `bench/`, `make bench`, `bench/results/release.csv`, README.md.
 
 ## 4. Features
 
@@ -602,3 +617,88 @@ Nothing needed an assumption or a lemma; these needed a shape:
   - **Not tested by S0:** a bucket whose answer holds many assets (the
     oracle's holds three), caps that bind, and the semi-covariance
     twelve of PRO's thirteen optimizers use.
+- **Implementation (A1-A12, branch `main`, 2026-10-06):** every item
+  built and committed, one cycle or more each, logged in
+  `docs/tdd-log.md`.  What changed from the items as written, and why:
+  - **Dependencies:** the library depends on sml (the plan says none,
+    and also makes the scanner and the solver's loop sml machines).
+    `proof/proof.gpr` withs sml only.
+  - **1.1 / A2:** `Frac` is a constant, not a generic parameter: S0
+    chose one grid.  `Arith.Product_Bound` is 2**126 + 2**110 (a value at
+    One * One less a dot of `Max_N` products, the spike's Numerator);
+    `Divisor_Bound` is 2**96, up from 2**64, so a power of ten can
+    divide.  `Quantities` is a generic over a range (First, Last), not
+    "over a name": an instance is already its own type, and a range is
+    a bound the prover uses.
+  - **Powers of two** are a written-out table (`Arith.Powers_Of_Two`):
+    gnatprove would not bound `2**K` for a variable K past about 30,
+    in an aggregate or with a typed base.
+  - **A3:** a fraction of any length rounds exactly: the whole part
+    times One plus (floor (F * 2**41) + 1) / 2, F scaled by a carry from
+    its last figure to its first in 64 bits (a limb form needed a
+    `10**K` invariant that did not prove).  Text is at most 64
+    characters; `Image` writes at most 20 places (13 always read back).
+  - **A5:** `Exp` and `Log` work at 2**-60 inside and round once, so
+    each is within a unit of the true value (exp relative above one);
+    graecus's tables were recomputed at that scale.  `Exp` takes
+    arguments up to 11.75.  `Inv_Norm_Cdf` is Wichura's AS 241, its
+    tails at 2**-52, within two units of the definition and of scipy.
+    The normal CDF keeps Abramowitz-Stegun's 7.5e-8.  graecus's
+    polynomial clamp at one was wrong for 26.2.17, whose polynomial
+    reaches 1.2533.
+  - **A7:** the sort is insertion, O(n**2): 9e6 comparisons at 3,000.
+    The quantile's postcondition says "an element" (nearest) or
+    "between two neighbours" (linear); "between the least and the
+    most" needs transitivity the adjacent-pair sortedness does not
+    give the prover.
+  - **A8:** the statistics take data of magnitude at most 256
+    (`Stats.Datum`): that keeps a variance a value and a window of
+    `Max_N` rows inside 128 bits.  Skewness and kurtosis are the means
+    of z**3 and z**4.  `Rolling.Remove_Row` refuses a row that cannot
+    have been in the window.
+  - **A9:** on this grid a singular matrix's last pivot is the root of
+    its rounding, about 1e-6, not zero; a pivot floor must sit above
+    it.  The dot kernels are `Inline`: across units GNAT inlines only
+    what is marked, which the spike hid by compiling them into its
+    bench, and the 3,000 factor fell from about 6 s to 4.6 s.
+  - **A10:** the units are `Qp` (types), `Qp.Admm` (the iteration and
+    its checks), `Qp.Certificate` (residuals, `Certified`, the
+    infeasibility certificates) and `Qp.Engine` (the machine and
+    `Solve`): `Solve`'s postcondition names `Certificate.Certified`,
+    which the parent's spec cannot see.  `Solve (Pr, S, Work, St,
+    Result)`: the caller holds the factor's workspace so a 3,000
+    problem's need not be on the stack, and the iterate is in out (the
+    warm start).  Outcomes: Certified, Infeasible, Unbounded,
+    Not_Convex, Stalled, Exhausted, Diverged; a bound at the end of the
+    values is no bound.  The machine's states are one per request
+    (Preparing, Iterating, Checking, Certifying) and one per outcome;
+    there is no Converged or Polished state.  Convexity is a separate
+    factorization of P + sigma I, which doubles the factor's cost.  The
+    infeasibility certificate projects the duals' change onto the polar
+    of the recession cone, as OSQP does.  **Polish was not built** (S0:
+    off the critical path).  The tests and fixtures the task added:
+    an answer holding 44 variables, 35 at their cap, an at-most budget
+    binding beside an exact one (certified, within 1e-6 of OSQP and
+    Clarabel); a linear program; infeasible and non-convex problems,
+    small and at 120; a warm start that takes fewer iterations.
+  - **A10, the open risk:** the tail-mean linear program (the CVaR
+    shape: 131 variables, 101 rows, open bounds) is not certified.
+    ADMM creeps at residuals near 1e-6 under every step size swept
+    (rho 2**-6 .. 2**2, rho_row 2**-2 .. 2**6, sigma 2**-20 .. 2**-6,
+    alpha 1 .. 1.75); OSQP does not finish it in 400,000 iterations
+    either.  The solve ends Exhausted, never Certified, with the weights
+    within 1e-3 of HiGHS's.  statera's CVaR optimizers need more than
+    this solver: a polish (an equality-constrained solve on the active
+    set, which in fixed point needs a quasi-definite LDL' or a range
+    the Schur complement can hold), Ruiz equilibration with adaptive
+    rho, or another method for linear programs.  That choice is the
+    user's.
+  - **A11:** SplitMix64; `Below` rejects by threshold, its redraws
+    capped at 128 so the loop's end is a fact.
+  - **Features:** wording the registry needed -- "the statistic is"
+    (stats), "the matrix of observations" (cholesky), "the root of 2"
+    (elementary) -- and qp.feature's first scenario splits a budget
+    between "two equal parts", not assets: no trading word in abacus.
+    A decimal argument is read to the grid first, so the elementary
+    scenarios take arguments the grid holds or state the rounding.
+

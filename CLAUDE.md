@@ -37,6 +37,9 @@ comment.
   in a contract, warnings as errors
 - `make no-float` — no floating-point type in any Ada source
 - `make shape`    — the shape lint (`tools/shape_check.py`)
+- `make bench`    — the benchmark at 180 and 3,000 (`alr build --release`
+  first; run it twice and keep the second).  `make bench-build`
+  compiles it, and `make ci` runs that so the bench always builds
 - `make ci`       — every gate above, cheapest first
 
 ## Layout
@@ -56,8 +59,11 @@ comment.
   and withs only sml).  `proof/src/abacus_proof.ads` withs every unit
   and instantiates every generic: keep it complete.
 - `tools/` — `shape_check.py`, the features report, and the seeded
-  fixture scripts.  Python only ever writes fixtures; it never runs at
-  build or test time.
+  fixture scripts (`make_elementary.py`, `make_qp.py`, writing
+  `tests/data/`; they need numpy, scipy, osqp and clarabel).  Python
+  only ever writes fixtures; it never runs at build or test time.
+- `bench/` — the benchmark (`bench.gpr`, not built by `alr build`) and
+  `bench/results/`, the numbers last kept.
 - `spike/` — S0's record.  Not built, not held to the gates.
 - `docs/tdd-log.md` — git-ignored TDD audit log.
 
