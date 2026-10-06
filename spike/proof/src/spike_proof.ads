@@ -1,3 +1,5 @@
+with Spike.Delta_Types; use Spike.Delta_Types;
+with Spike.Deltas;
 with Spike.Grid;
 with Spike.Linear;
 
@@ -15,5 +17,9 @@ is
    package Linear_32 is new Spike.Linear (32);
    package Linear_40 is new Spike.Linear (40);
    package Linear_48 is new Spike.Linear (48);
+
+   package Deltas_32 is new Spike.Deltas (Fix_32, Acc_32);
+   package Deltas_40 is new Spike.Deltas (Fix_40, Acc_40);
+   package Deltas_48 is new Spike.Deltas (Fix_48, Acc_48);
 
 end Spike_Proof;

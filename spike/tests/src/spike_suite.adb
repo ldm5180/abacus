@@ -1,4 +1,5 @@
 with Spike_Grid_Tests;
+with Spike_Deltas_Tests;
 with Spike_Kernels_Tests;
 with Spike_Linear_Tests;
 
@@ -10,12 +11,14 @@ package body Spike_Suite is
    Grid    : aliased Spike_Grid_Tests.Test;
    Kernels : aliased Spike_Kernels_Tests.Test;
    Linear  : aliased Spike_Linear_Tests.Test;
+   Deltas  : aliased Spike_Deltas_Tests.Test;
 
    function Suite return Access_Test_Suite is
    begin
       Add_Test (Result'Access, Grid'Access);
       Add_Test (Result'Access, Kernels'Access);
       Add_Test (Result'Access, Linear'Access);
+      Add_Test (Result'Access, Deltas'Access);
       return Result'Access;
    end Suite;
 
