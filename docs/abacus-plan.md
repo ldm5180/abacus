@@ -1,7 +1,9 @@
 # abacus plan
 
-**Status (2026-10-06):** planned, nothing built.  Three iterations
-done (see Revision notes).
+**Status (2026-10-06):** S0 done on branch `spike` (`spike/`):
+**go**, with scaled 64-bit integers at `Frac = 40` (section 2).  A1
+onward not started.  Three iterations of the plan, then S0's note (see
+Revision notes).
 
 abacus is fixed-point numerics for Ada 2022, proved in SPARK:
 arithmetic on scaled integers, text and IEEE conversion, elementary
@@ -110,14 +112,136 @@ and the check is proved.
 
 ## 2. S0's verdict
 
-*To be filled in by S0.*
+**Go.**  Representation (b), 64-bit scaled integers with a 128-bit
+accumulator, at `Frac = 40`, meets all four bars.  `Frac = 48` meets
+them too; `Frac = 32` reaches the accuracy but cannot certify it, and
+so misses the speed bar as configured.  Representation (a), Ada
+`delta` types, was measured through the kernels and stopped there
+(below, "Why not (a)").
 
-| criterion | bar | measured |
-|---|---|---|
-| proof | every check of the spike units proves at level 2, whole run under 10 minutes | |
-| accuracy | weights for the test bucket within 1e-6 of the oracle's | |
-| speed, one bucket | 180 assets, 250 days: estimate, factor and solve under 100 ms | |
-| speed, large | factor a 3,000 x 3,000 matrix under 60 s | |
+| criterion | bar | (b) Frac 32 | (b) Frac 40 | (b) Frac 48 |
+|---|---|---|---|---|
+| proof | every check proves at level 2, whole run under 10 minutes | all proved | all proved | all proved |
+| accuracy | weights within 1e-6 of the oracle's | within 1e-6 at iteration 110; floor 4.4e-8; **not certifiable**: the residuals' floor (primal 7-10 units, 2.3e-9) lies above the tolerance that implies 1e-6, so the solve runs to its cap | within 1e-6 at iteration 110; the solver's own rule stops at 140 with 7.1e-8; floor 2.2e-10 | within 1e-6 at 110; rule stops at 140 with 7.1e-8; floor 7.5e-13 |
+| speed, one bucket | estimate, factor and solve under 100 ms | **115.0 ms** (93.8 unchecked): 4,000 iterations, Exhausted | **7.21 ms** (5.57 unchecked), 140 iterations, Converged | 7.22 ms (5.67 unchecked) |
+| speed, large | factor a 3,000 x 3,000 matrix under 60 s | 3.52 s (3.18 unchecked) | **3.57 s** (3.22 unchecked) | 3.53 s (2.99 unchecked) |
+
+The proof row is one run over every spike unit at all three grids,
+representation (a)'s kernels included: **2,842 checks, all proved,
+1 min 40 s wall from a clean `proof/obj`** (gnatprove 15, `--level=2
+--checks-as-errors=on -j0`, 12 cores, 320 MB).  The hardest single
+check took 5,176 steps and 0.1 s (`Spike.Deltas.Quotient`); in (b)
+none took more than 2,195.  No `pragma Assume`, no `SPARK_Mode Off`
+in any spike unit; the tests, the benchmark and the fixture reader
+are not SPARK (AUnit, files, a clock, the heap).
+
+**How the numbers were made.**  `spike/bench`, two profiles, both
+`-O3 -gnatn`: *release* keeps the language checks (no `-gnata`),
+*unchecked* adds `-gnatp`, removing every check the proof discharges.
+One thread.  Each profile was run twice and the second run kept
+(`spike/bench/results/`); the bucket is the best of five
+`Solve_Bucket` calls.  At Frac 40 the bucket splits as estimate 2.59
+ms (1.89), form and factor 0.87 ms (0.69), solve 4.69 ms (3.82, its
+own factor included).  The iteration traces are byte-identical in both
+profiles.
+
+**The bucket and the oracle.**  `spike/tools/make_bucket.py`, seed
+20261006: 180 assets in two blocks of 90, 250 days; the sample's
+median correlation is 0.7345 within a block and -0.3142 between
+(population 0.73 and -0.26), returns' mean 0.0015 (population 0.005,
+the sample's common factor pulled it down), std 0.053, min -0.35.
+The problem is PRO's: minimize (1/2) w'(20 S + 1e-6 I) w - mu'w,
+0 <= w <= 1, each block summing to 0.10, S the sample covariance.  The
+oracle (OSQP, eps 1e-9, polished, 325 iterations) holds three assets;
+Clarabel agrees to within 1.2e-12 and an exact KKT solve on OSQP's
+active set to within 6e-16, with every multiplier sign right.  Returns and answers are
+written as raw integers at each grid, from returns already rounded to
+that grid.
+
+**How the Ada side forms its inputs** (statera follows this):
+
+1. Returns are held one row per asset.  Each row is centered on its
+   mean (one rounding), its variance summed exactly at scale
+   `One * One` and divided by n - 1.
+2. The deviation is the integer root of the variance *raised by fours
+   while it fits* (up to 20 extra bits), and the inverse deviation is
+   taken from that lifted root.  Without the lift a deviation near
+   0.05 rounded at 2^-32 is good to only 2.5e-9, which put the
+   correlation's diagonal about 20 units off.  With it, means and
+   deviations are within 1 unit of numpy's and two correlation rows
+   within 4, at every grid.
+3. Each row becomes its z-scores in place; the correlation is
+   `Z Z' / (n - 1)`, one rounding per entry.  The covariance never
+   exists as a matrix.
+4. The problem is solved in correlation space, `x = sigma w`:
+   `P = C + ridge / (lambda sigma^2)`, `q = -mu / (lambda sigma)`, box
+   `0 .. cap sigma`, and each block's row `sum x / sigma = budget`
+   divided through by the row's length.  `P` has a unit diagonal and
+   entries in -1 .. 1.  Weights come back as `w = x / sigma`, with the
+   same inverse deviation the z-scores used, so the change of
+   variables is exact whatever that inverse's rounding.
+
+The same problem formed in the weights themselves (covariance space)
+also reaches 1e-6, at 540 iterations against 110, with the rule
+stopping at about 1,015 and a lower floor (30-48 units).  Correlation
+space buys four to five times fewer iterations; the accuracy does not
+depend on it.
+
+**The ADMM, as measured.**  A10's method, OSQP's relaxed step:
+`P + sigma I + rho I + rho_row E'E` factored once; rho = 1, rho_row =
+2^3, sigma = 2^-20, alpha = 1.6; residuals checked every 10
+iterations; tolerances 1e-10 (primal) and 1e-9 (dual) as values, the
+same at every grid.  Every step size is a power of two, so applying
+one is a shift.  ADMM did not stall short of 1e-6 at any grid, so none
+of the fallbacks was needed: correlation space was the starting
+formulation, and **polish and the dual active-set method were not
+built**.  Sweeping rho_row from 2^2 to 2^10 moved the iterations to
+1e-6 only between 110 and 150; 2^3 was fastest.
+
+**Why not (a).**  Its kernels are not slower where the time goes: a
+product accumulated into a type whose Small is the square of the
+operands' needs no rescale, and `objdump` shows the dot loop with no
+call (0.78 ns per term against (b)'s 0.49 with checks, 0.33 for both
+under `-gnatp`).  The 3,000 factor is 4.92 s (3.01 unchecked) against
+(b)'s 3.57 s (3.22), inside the bar.  What decides it:
+
+- the per-element step ADMM takes on every iteration, a product
+  rescaled to its operands' grid, is **11.7 ns in (a) against 1.06 ns
+  in (b)** (11.5 against 0.60 unchecked): graecus's finding holds for
+  this operation and no other;
+- SPARK refuses `Fix'Round` of a quotient ("not yet supported", and
+  the quotient is `root_real`), so every rounded quotient is truncated
+  and corrected by its remainder, one more product each;
+- a raw 64-bit integer cannot enter a `delta` value in SPARK:
+  `'Fixed_Value` is refused, `Fix'Small * Integer` takes only a
+  32-bit `Integer`, and converting the integer to `Fix` first
+  overflows (only the way out, `X / Fix'Small` to an integer, is
+  accepted);
+- a `delta` type's Small must be static, so (a) needs its types
+  declared per grid, where (b) is one generic over `Frac`.
+
+**What took more than a loop invariant and a subtype to prove.**
+Nothing needed an assumption or a lemma; these needed a shape:
+
+- `Shifted` (a value times 2^s): its result had no bound, and 30
+  overflow checks downstream failed.  The power comes from a table
+  whose element subtype is `1 .. 2^30`, plus a postcondition on
+  `Shifted` -- bounding the input, as graecus found.
+- The lifted root: four-power and two-power counters that the prover
+  could not relate are bounded instead by explicit exit tests in the
+  loop.
+- Pivots are a positive subtype in both representations; (a) first
+  had a quantified invariant over the pivots, which did not prove.
+- (a) needed a precondition on the instance (`Roomy`: the
+  accumulator holds Max_N products plus a value) and accumulator
+  ranges at 1.5 times the largest dot product.
+- `Store`, the checked narrowing every step goes through, carries a
+  postcondition.
+- Two tool limits, rewritten around: gnatprove's frontend refused an
+  if-expression returning aggregates in an inlined function ("cannot
+  untangle node N_IF_EXPRESSION"); `Fix'Round` as above.
+- The integer root's `R * R <= X` invariant, nonlinear, proved with no
+  help.
 
 ## 3. Items
 
@@ -442,3 +566,37 @@ and the check is proved.
   user's choice of an all-SPARK solver rules out.  Not verified,
   and S0 exists to find out: that ADMM converges in fixed point at
   this size, and that the factorization's range proofs go through.
+- **S0 (the spike, branch `spike`, 2026-10-06):** go, (b) at Frac
+  40; section 2 has the numbers.  What it changes:
+  - **1.1:** add `subtype Val is Raw range -2**57 .. 2**57` as the
+    bound on every stored value, whatever `Frac`: a product is then at
+    most 2^114 and a sum of 4,096 of them fits in 128 bits.  At Frac 40
+    a stored value is within about +-131,000, not the +-8.3 million a
+    `Raw` holds.
+  - **A2:** narrowing goes through one checked store that clears an
+    `Ok` and leaves the target as it was, never a silent saturation.
+    `Div_Round` takes a `Divisor` subtype (1 .. 2^64) so a count times
+    `One` can divide.
+  - **A5:** the factorization and the deviations need an integer root
+    of a 128-bit value at scale `One * One` (bit by bit, rounded to
+    nearest; it proves), not graecus's root over [0, 1].  A deviation
+    is taken from the variance raised by fours while it fits.
+  - **A8:** standardize, then correlate; the covariance need not exist
+    as a matrix.
+  - **A9:** pivots as a positive subtype; one rounded division per
+    off-diagonal entry; the upper triangle mirrored so the back solve
+    reads rows.  3,000 factors in 3.6 s.
+  - **A10:** store only the general rows (the box rows are the
+    identity); step sizes as powers of two; rho_row small (2^3), not
+    OSQP's thousand times rho, because those rows' duals move in
+    steps of rho_row units of the grid; tolerances as values (1e-10 /
+    1e-9 in correlation space); a `Stalled` outcome for an iterate the
+    grid holds still (it never fired on the bucket, whose iterate keeps
+    moving at its floor; a two-variable test cycled with period three).  `Solve` as sketched has three `out` parameters, over the
+    shape limit of two: the spike passes the iterate as one `in out`
+    state record.  Polish is not on the critical path.  At Frac 32 no
+    residual rule certifies 1e-6, so `Certified` would never be
+    reached there: another reason for 40.
+  - **Not tested by S0:** a bucket whose answer holds many assets (the
+    oracle's holds three), caps that bind, and the semi-covariance
+    twelve of PRO's thirteen optimizers use.
