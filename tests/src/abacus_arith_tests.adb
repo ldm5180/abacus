@@ -40,6 +40,36 @@ package body Abacus_Arith_Tests is
       Assert (Div (-1, 2 * One) = -1, "minus half a unit rounds away");
    end Test_Third;
 
+   --  A product or a quotient past the values is held at the largest
+   --  value of its sign and reported; a quotient by zero is undefined.
+   procedure Test_Saturates (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Big : constant Val := 100_000 * One;
+   begin
+      Assert (Mul_Sat (Big, Big) = (Val'Last, Saturated), "too large");
+      Assert (Mul_Sat (Big, -Big) = (Val'First, Saturated), "too small");
+      Assert (Mul_Sat (One / 2, One / 2) = (One / 4, Ok), "in range");
+      Assert (Div_Sat (Big, 1) = (Val'Last, Saturated), "a huge quotient");
+      Assert (Div_Sat (-Big, 1) = (Val'First, Saturated), "a huge negative");
+      Assert (Div_Sat (One, 2 * One) = (One / 2, Ok), "a half");
+      Assert (Div_Sat (One, 0) = (0, Undefined), "a quotient by zero");
+   end Test_Saturates;
+
+   --  A wide result that fits is stored; one that does not clears Ok and
+   --  leaves the target alone.
+   procedure Test_Store (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      V  : Val := 7;
+      Ok : Boolean := True;
+   begin
+      Store (Wide (Val'Last), V, Ok);
+      Assert (V = Val'Last and then Ok, "the largest value fits");
+      Store (Wide (Val'Last) + 1, V, Ok);
+      Assert (V = Val'Last and then not Ok, "one more does not");
+      Store (-5, V, Ok);
+      Assert (V = -5 and then not Ok, "a later fit stores but keeps Ok");
+   end Test_Store;
+
    overriding
    procedure Register_Tests (T : in out Test) is
       use AUnit.Test_Cases.Registration;
@@ -49,6 +79,9 @@ package body Abacus_Arith_Tests is
       Register_Routine
         (T, Test_Ties_Away'Access, "A tie rounds away from zero");
       Register_Routine (T, Test_Third'Access, "A quotient rounds to nearest");
+      Register_Routine
+        (T, Test_Saturates'Access, "A result too large is held and said");
+      Register_Routine (T, Test_Store'Access, "The checked store");
    end Register_Tests;
 
    overriding
