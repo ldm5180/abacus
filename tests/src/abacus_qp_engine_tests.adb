@@ -1,8 +1,11 @@
+with Ada.Unchecked_Deallocation;
+
 with AUnit.Assertions; use AUnit.Assertions;
 
 with Abacus;             use Abacus;
 with Abacus.Qp;          use Abacus.Qp;
 with Abacus.Qp.Certificate;
+with Abacus.Qp.Engine;
 with Abacus_Qp_Fixtures;
 with Abacus_Qp_Problems; use Abacus_Qp_Problems;
 
@@ -237,6 +240,38 @@ package body Abacus_Qp_Engine_Tests is
       Assert (R.Result = Certified and then R.Worst <= Millionth, Report (R));
    end Test_Tail_Bounded;
 
+   type Problem_Access is access Problem;
+   type Workspace_Access is access Workspace;
+
+   procedure Free is new Ada.Unchecked_Deallocation (Problem, Problem_Access);
+   procedure Free is new
+     Ada.Unchecked_Deallocation (Workspace, Workspace_Access);
+
+   --  The tail-mean program at the size it is used at -- 180 columns over
+   --  250 scenarios, so 431 variables and 251 rows -- with its threshold
+   --  and shortfalls boxed by its data: certified from cold within the
+   --  default cap.
+   procedure Test_Tail_At_Size (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Columns   : constant := 180;
+      Scenarios : constant := 250;
+      Seed      : constant := 20261006;
+      Pr        : Problem_Access :=
+        new Problem (Columns + 1 + Scenarios, Scenarios + 1);
+      Work      : Workspace_Access;
+      St        : State (Pr.N, Pr.K) := Cold (Pr.N, Pr.K);
+      Result    : Outcome;
+   begin
+      Pose_Tail (Pr.all, Columns, Seed);
+      Work := new Workspace (Pr.N, Pr.K);
+      Abacus.Qp.Engine.Solve (Pr.all, Default_Settings, Work.all, St, Result);
+      Assert
+        (Result = Certified,
+         Result'Image & " after" & St.Iterations'Image & " iterations");
+      Free (Pr);
+      Free (Work);
+   end Test_Tail_At_Size;
+
    procedure Test_Fixture_Refusals
      (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
@@ -267,6 +302,8 @@ package body Abacus_Qp_Engine_Tests is
       Register_Routine (T, Test_Tail'Access, "The tail-mean linear program");
       Register_Routine
         (T, Test_Tail_Unpolished'Access, "The tail-mean program, unpolished");
+      Register_Routine
+        (T, Test_Tail_At_Size'Access, "The tail-mean program, 180 by 250");
       Register_Routine
         (T, Test_Tail_Bounded'Access, "The tail-mean program, boxed");
       Register_Routine

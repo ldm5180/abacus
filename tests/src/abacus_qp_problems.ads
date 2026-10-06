@@ -1,3 +1,5 @@
+with Interfaces;
+
 with Abacus;    use Abacus;
 with Abacus.Qp; use Abacus.Qp;
 
@@ -16,6 +18,18 @@ package Abacus_Qp_Problems is
    --  Two with P given in place of the identity.
    function With_P (Pr : Problem; P : Matrix) return Problem
    with Pre => P'Length (1) = Pr.N and then P'Length (2) = Pr.N;
+
+   --  The tail-mean linear program over Columns columns and Pr.K - 1
+   --  seeded scenarios, posed as a caller who knows its data poses it.
+   --  Variables: the weights w (each 0 .. 0.05), the threshold a and
+   --  the shortfalls u.  Minimize -m'w + a + sum (u) / (0.05 T), m the
+   --  columns' means over the T scenarios, subject to r_s'w + a + u_s
+   --  >= 0 and sum (w) = 1; a boxed by the range of the scenarios'
+   --  losses, each u_s by its largest.  A return is 0.0005 + 0.02 z +
+   --  0.01 g, z the column's and g the scenario's normal draw.
+   procedure Pose_Tail
+     (Pr : out Problem; Columns : Positive; Seed : Interfaces.Unsigned_64)
+   with Pre => Pr.N = Columns + Pr.K and then Pr.K >= 2;
 
    --  Solve from St with S; the outcome.
    function Solved
