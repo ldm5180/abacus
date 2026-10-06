@@ -1,4 +1,5 @@
 with Abacus;
+with Abacus.Arith;
 
 --  gnatprove analyses a unit only when it is in the closure of the
 --  project's sources.  This package withs every Abacus unit so one
