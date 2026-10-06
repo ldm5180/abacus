@@ -172,7 +172,7 @@ package body Abacus_Steps.Qp is
 
    --  The fixtures tools/make_qp.py wrote.
    function Is_Fixture (Name : String) return Boolean
-   is (Name in "spread" | "cvar" | "infeasible" | "nonconvex");
+   is (Name in "spread" | "tail" | "infeasible" | "nonconvex");
 
    function Fixture_Name (G : Program) return String
    is (G.Fixture (1 .. G.Named));
@@ -363,7 +363,7 @@ package body Abacus_Steps.Qp is
          when A_Refuse_Pose        =>
            "a problem has 1 to"
            & Max_Variables'Image
-           & " variables, or is one of the fixtures: spread, cvar,"
+           & " variables, or is one of the fixtures: spread, tail,"
            & " infeasible, nonconvex",
          when A_Refuse_Part        =>
            "a bound or a total is a decimal number, a variable one of the"

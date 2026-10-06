@@ -189,7 +189,7 @@ package body Abacus_Qp_Engine_Tests is
        & R.Worst'Image
        & " units");
 
-   --  120 assets, 44 held, 35 at their cap, an at-most budget binding
+   --  120 variables, 44 held, 35 at their cap, an at-most budget binding
    --  beside an exact one: certified, within a millionth of OSQP's.
    procedure Test_Spread (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
@@ -198,19 +198,19 @@ package body Abacus_Qp_Engine_Tests is
       Assert (R.Result = Certified and then R.Worst <= Millionth, Report (R));
    end Test_Spread;
 
-   --  The conditional value-at-risk linear program is not certified:
+   --  The tail-mean linear program is not certified:
    --  ADMM, like OSQP (which runs to 400,000 iterations on it), creeps
    --  at residuals near 1e-6, so the cap is reached.  What holds is that
    --  it is reported as such, never as certified, and that the weights
    --  are within a thousandth of the simplex's.
-   procedure Test_Cvar (T : in out AUnit.Test_Cases.Test_Case'Class) is
+   procedure Test_Tail (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
       Thousandth : constant := One / 1_000;
       R          : constant Fixture_Run :=
-        Run_Fixture ("cvar", (Default_Settings with delta Max_Iter => 40_000));
+        Run_Fixture ("tail", (Default_Settings with delta Max_Iter => 40_000));
    begin
       Assert (R.Result = Exhausted and then R.Worst <= Thousandth, Report (R));
-   end Test_Cvar;
+   end Test_Tail;
 
    procedure Test_Fixture_Refusals
      (T : in out AUnit.Test_Cases.Test_Case'Class)
@@ -239,7 +239,7 @@ package body Abacus_Qp_Engine_Tests is
       Register_Routine (T, Test_Exhausted'Access, "Exhausted");
       Register_Routine (T, Test_Warm'Access, "A warm start");
       Register_Routine (T, Test_Spread'Access, "The spread fixture");
-      Register_Routine (T, Test_Cvar'Access, "The CVaR linear program");
+      Register_Routine (T, Test_Tail'Access, "The tail-mean linear program");
       Register_Routine
         (T,
          Test_Fixture_Refusals'Access,

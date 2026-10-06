@@ -8,7 +8,7 @@ Feature: Quadratic programs
   unbounded, and one whose matrix is not positive semidefinite as not
   convex.
 
-  Scenario: A budget is split between two equal assets
+  Scenario: A budget is split between two equal parts
     Given a problem in 2 variables with the identity as its matrix
     And both variables between 0 and 1
     And the variables summing to exactly 1
@@ -77,7 +77,7 @@ Feature: Quadratic programs
     Then the answer is certified
     And it took fewer iterations than a cold start does
 
-  Scenario: An answer holding dozens of assets, with caps and two budgets, agrees with OSQP's
+  Scenario: An answer holding dozens of variables, with caps and two budgets, agrees with OSQP's
     Given the spread problem from the fixtures
     When it is solved
     Then the answer is certified
@@ -95,6 +95,6 @@ Feature: Quadratic programs
     Then the outcome is not convex
 
   Scenario: An answer the solver cannot certify is reported so, never as certified
-    Given the cvar problem from the fixtures
+    Given the tail problem from the fixtures
     When it is solved
     Then the outcome is exhausted

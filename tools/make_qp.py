@@ -5,13 +5,13 @@ Four problems, each in the form the library takes:
     minimize (1/2) x'P x + q'x
     subject to lo <= x <= hi and row_lo <= E x <= row_hi
 
-* spread: 120 assets in correlation space (P a sample correlation plus
+* spread: 120 variables in correlation space (P a sample correlation plus
   a ridge, so its diagonal is one), each capped at 0.025, the whole
   summing to exactly one and the first 30 to at most 0.25.  The answer
-  holds dozens of assets, several at their cap, and the at-most budget
+  holds dozens of variables, several at their cap, and the at-most budget
   binds.
-* cvar: the linear program of a conditional value-at-risk at 95% over
-  100 scenarios of 30 assets: variables w (30, in 0 .. 0.2), the
+* tail: the linear program of a tail mean at 95% (the mean of the worst
+  5% of 100 scenarios) over 30 columns: variables w (30, in 0 .. 0.2), the
   threshold t (no bounds) and the shortfalls u (100, at least zero);
   minimize t + sum (u) / (0.05 * 100) - 0.1 mu'w subject to
   r_s'w + t + u_s >= 0 and sum (w) = 1.  P is zero.
@@ -87,23 +87,23 @@ def spread(rng):
     return dict(p=p, q=q, lo=lo, hi=hi, e=e, row_lo=row_lo, row_hi=row_hi)
 
 
-def cvar(rng):
-    assets, scenarios, beta = 30, 100, 0.95
-    r = grid(rng.normal(0.004, 0.02, (scenarios, assets)))
+def tail(rng):
+    columns, scenarios, beta = 30, 100, 0.95
+    r = grid(rng.normal(0.004, 0.02, (scenarios, columns)))
     mu = r.mean(axis=0)
-    n = assets + 1 + scenarios
+    n = columns + 1 + scenarios
     q = np.zeros(n)
-    q[:assets] = grid(-0.1 * mu)
-    q[assets] = 1.0
-    q[assets + 1:] = grid(1.0 / ((1.0 - beta) * scenarios))
-    lo = np.concatenate([np.zeros(assets), [-np.inf], np.zeros(scenarios)])
-    hi = np.concatenate([np.full(assets, 0.2), [np.inf],
+    q[:columns] = grid(-0.1 * mu)
+    q[columns] = 1.0
+    q[columns + 1:] = grid(1.0 / ((1.0 - beta) * scenarios))
+    lo = np.concatenate([np.zeros(columns), [-np.inf], np.zeros(scenarios)])
+    hi = np.concatenate([np.full(columns, 0.2), [np.inf],
                          np.full(scenarios, np.inf)])
     e = np.zeros((scenarios + 1, n))
-    e[:scenarios, :assets] = r
-    e[:scenarios, assets] = 1.0
-    e[:scenarios, assets + 1:] = np.eye(scenarios)
-    e[scenarios, :assets] = 1.0
+    e[:scenarios, :columns] = r
+    e[:scenarios, columns] = 1.0
+    e[:scenarios, columns + 1:] = np.eye(scenarios)
+    e[scenarios, :columns] = 1.0
     row_lo = np.concatenate([np.zeros(scenarios), [1.0]])
     row_hi = np.concatenate([np.full(scenarios, np.inf), [1.0]])
     return dict(p=np.zeros((n, n)), q=q, lo=lo, hi=hi, e=e,
@@ -203,7 +203,7 @@ def report(name, pr, out, lines):
         lines.append(f"  linear: Clarabel {status}; HiGHS status {hi_status};"
                      f" max |Clarabel - HiGHS| = {np.max(np.abs(x - x_hi)):.3e};"
                      f" objective {pr['q'] @ x_hi:.12e} (HiGHS, the oracle);"
-                     f" {int((x_hi[:30] > 1e-7).sum())} assets held")
+                     f" {int((x_hi[:30] > 1e-7).sum())} columns above zero")
         lines.append("  x: " + ", ".join(f"{v:.12f}" for v in x_hi))
     elif info.status in ("solved", "solved inaccurate"):
         x_cl, status = solve_clarabel(pr)
@@ -226,7 +226,7 @@ def main(out):
     base = spread(rng)
     problems = {
         "spread": base,
-        "cvar": cvar(rng),
+        "tail": tail(rng),
         "infeasible": dict(base, hi=np.full(len(base["q"]), 0.008),
                            row_hi=np.array([1.0, 0.3])),
         "nonconvex": dict(base, p=grid(base["p"] - 2.0 * np.eye(len(base["q"])))),
