@@ -25,11 +25,11 @@ bench:
 ## format    gnatformat over the committed Ada sources
 format:
 	alr exec -- gnatformat --charset utf-8 -P spike.gpr --check $$(git ls-files 'src/*.ad[sb]')
-	alr exec -- gnatformat --charset utf-8 -P tests/tests.gpr --check $$(git ls-files 'tests/src/*.ad[sb]')
+	alr exec -- gnatformat --charset utf-8 -P tests/tests.gpr --check $$(git ls-files 'tests/src/*.ad[sb]' 'harness/*.ad[sb]')
 	alr exec -- gnatformat --charset utf-8 -P bench/bench.gpr --check $$(git ls-files 'bench/src/*.ad[sb]')
 	alr exec -- gnatformat --charset utf-8 -P proof/proof.gpr --check $$(git ls-files 'proof/src/*.ad[sb]')
 
 ## no-float  No floating-point type anywhere in the spike's Ada
 no-float:
 	! grep -rniE '\b(long_)*float\b|\bdigits\b|elementary_functions' \
-	  --include='*.ad[sb]' src tests/src bench/src proof/src
+	  --include='*.ad[sb]' src tests/src bench/src proof/src harness

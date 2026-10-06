@@ -8,9 +8,6 @@ is
    package G is new Spike.Grid (Frac);
    One : constant Wide := G.One;
 
-   function Fits (W : Wide) return Boolean
-   is (W in Wide (Val'First) .. Wide (Val'Last));
-
    --  A (I, J) at scale One * One less the dot of rows I and J over the
    --  columns before J: what is left of the entry once the rows of L
    --  already known are taken out.
@@ -30,7 +27,7 @@ is
        and then D'First = A'First (1)
        and then D'Last = A'Last (1)
    is
-      Q : constant Wide := Div_Round (Remainder (A, I, J), D (J));
+      Q : constant Wide := Div_Round (Remainder (A, I, J), Wide (D (J)));
    begin
       Ok := Fits (Q);
       if Ok then
@@ -132,7 +129,7 @@ is
                  then From >= L'First (1) and then To <= L'Last (1))
    is
       Q : constant Wide :=
-        Div_Round (Wide (B (I)) * One - Dot (L, I, B, From, To), D (I));
+        Div_Round (Wide (B (I)) * One - Dot (L, I, B, From, To), Wide (D (I)));
    begin
       Ok := Fits (Q);
       if Ok then

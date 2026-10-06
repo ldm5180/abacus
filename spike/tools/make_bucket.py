@@ -9,7 +9,9 @@ one:
     subject to 0 <= w_i <= 1, and each block's weights sum to 0.10
 
 where S is the sample covariance (divisor n - 1) and mu the sample mean
-of the returns.  For each Frac in FRACS the returns are rounded to the
+of the returns.  moments_f<Frac>.txt holds, as rows, the mean, the
+standard deviation (divisor n - 1), and the first and last rows of the
+correlation matrix, for checking an estimate stage by stage.  For each Frac in FRACS the returns are rounded to the
 grid 2**-Frac, and the oracle is computed from THOSE returns, so the
 Ada side and the oracle see the same inputs.
 
@@ -171,6 +173,11 @@ def main(out):
         write_ints(out / f"returns_f{frac}.txt", f"{DAYS} {ASSETS}", raw)
         write_ints(out / f"weights_f{frac}.txt", f"{ASSETS}",
                    to_raw(w_osqp, frac))
+        corr = np.corrcoef(rq, rowvar=False)
+        write_ints(out / f"moments_f{frac}.txt", f"{ASSETS}",
+                   np.vstack([to_raw(rq.mean(axis=0), frac),
+                              to_raw(rq.std(axis=0, ddof=1), frac),
+                              to_raw(corr[0], frac), to_raw(corr[-1], frac)]))
         lines.append("")
         lines.append(f"Frac {frac}:")
         lines.append(

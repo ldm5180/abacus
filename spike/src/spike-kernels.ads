@@ -31,6 +31,10 @@ is
                    and then From >= V'First
                    and then To <= V'Last);
 
+   --  Whether a wide result can be stored as a value.
+   function Fits (W : Wide) return Boolean
+   is (W in Wide (Val'First) .. Wide (Val'Last));
+
    --  The nearest integer to the square root of X.  An argument at scale
    --  One * One gives a root at scale One.
    subtype Root_Arg is Wide range 0 .. Term_Bound - 1;
@@ -44,9 +48,11 @@ is
    subtype Numerator is Wide range -Numerator_Bound .. Numerator_Bound;
 
    --  S / D rounded half away from zero.
-   function Div_Round (S : Numerator; D : Pivot) return Wide
-   is (if S >= 0
-       then (S + Wide (D) / 2) / Wide (D)
-       else -((-S + Wide (D) / 2) / Wide (D)));
+   --  What a quotient may be divided by: a pivot, a count of days, or a
+   --  count times One.
+   subtype Divisor is Wide range 1 .. 2**64;
+
+   function Div_Round (S : Numerator; D : Divisor) return Wide
+   is (if S >= 0 then (S + D / 2) / D else -((-S + D / 2) / D));
 
 end Spike.Kernels;
