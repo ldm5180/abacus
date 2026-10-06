@@ -1,5 +1,6 @@
 with Abacus;
 with Abacus.Arith;
+with Abacus.Ieee;
 with Abacus.Quantities;
 with Abacus.Text;
 
