@@ -24,6 +24,17 @@ is
 
    subtype Val is Raw range -Val_Bound .. Val_Bound;
 
+   type Vector is array (Index range <>) of Val;
+   type Matrix is array (Index range <>, Index range <>) of Val;
+
+   --  The largest product of two values, and so the bound on one term
+   --  of a dot product.
+   Term_Bound : constant := 2**(2 * Val_Bits);
+
+   --  The bound on any dot product: Max_N terms of Term_Bound.
+   Dot_Bound : constant := Max_N * Term_Bound;
+   subtype Dot_Sum is Wide range -Dot_Bound .. Dot_Bound;
+
    --  The grids the spike measures, and the widest it allows.
    subtype Frac_Bits is Natural range 16 .. 52;
 
