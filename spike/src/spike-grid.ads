@@ -16,4 +16,8 @@ package Spike.Grid with SPARK_Mode, Pure is
    is (if A >= 0 then (A + Half) / One else -((-A + Half) / One))
    with Post => Round'Result in (-(2**126)) / One - 1 .. 2**126 / One + 1;
 
+   --  A product of two values, rounded once to the grid.
+   function Mul (A, B : Val) return Wide
+   is (Round (Wide (A) * Wide (B)));
+
 end Spike.Grid;

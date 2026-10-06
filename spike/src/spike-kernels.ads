@@ -52,6 +52,15 @@ is
    function Fits (W : Wide) return Boolean
    is (W in Wide (Val'First) .. Wide (Val'Last));
 
+   --  W stored into V when it fits; Ok cleared, and V left as it was,
+   --  when it does not.
+   procedure Store (W : Wide; V : in out Val; Ok : in out Boolean)
+   with
+     Post =>
+       (if Fits (W)
+        then Wide (V) = W and then Ok = Ok'Old
+        else not Ok and then V = V'Old);
+
    --  The nearest integer to the square root of X.  An argument at scale
    --  One * One gives a root at scale One.
    subtype Root_Arg is Wide range 0 .. Term_Bound - 1;

@@ -14,9 +14,7 @@ is
 
    One : constant Wide := G.One;
 
-   --  A product of two values, rounded to the grid.
-   function Mul (A, B : Val) return Wide
-   is (G.Round (Wide (A) * Wide (B)));
+   function Mul (A, B : Val) return Wide renames G.Mul;
 
    --  2**K for a step's exponent, bounded by its element subtype so a
    --  product with a value has a bound the prover can see.
@@ -33,16 +31,6 @@ is
        then Wide (V) * Powers (S)
        else Div_Round (Wide (V), Powers (-S)))
    with Post => Shifted'Result in -Shifted_Bound .. Shifted_Bound;
-
-   --  W stored into V when it fits; Ok cleared when it does not.
-   procedure Store (W : Wide; V : in out Val; Ok : in out Boolean) is
-   begin
-      if Fits (W) then
-         V := Val (W);
-      else
-         Ok := False;
-      end if;
-   end Store;
 
    function Clamp (W : Wide; Lo, Hi : Val) return Val
    is (if W <= Wide (Lo) then Lo elsif W >= Wide (Hi) then Hi else Val (W));

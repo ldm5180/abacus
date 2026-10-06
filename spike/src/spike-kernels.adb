@@ -68,6 +68,15 @@ is
       return Acc;
    end Dot_Column;
 
+   procedure Store (W : Wide; V : in out Val; Ok : in out Boolean) is
+   begin
+      if Fits (W) then
+         V := Val (W);
+      else
+         Ok := False;
+      end if;
+   end Store;
+
    --  Bit by bit from 2**56 down: R is the largest integer whose square
    --  is at most X, then one comparison rounds it to nearest.  R stays
    --  under 2**57 because its square is under 2**114; the clamp on the
