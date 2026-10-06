@@ -3,22 +3,20 @@ with Interfaces; use Interfaces;
 with AUnit.Assertions; use AUnit.Assertions;
 
 with Abacus;         use Abacus;
+with Abacus.Random;  use Abacus.Random;
 with Abacus.Vectors; use Abacus.Vectors;
 
 package body Abacus_Vectors_Tests is
 
-   --  A seeded vector of N values within Bound, from Knuth's MMIX
-   --  generator, for tests that need many elements.
-   Multiplier : constant := 6_364_136_223_846_793_005;
-   Increment  : constant := 1_442_695_040_888_963_407;
-
+   --  A seeded vector of N values within Bound.
    function Seeded (N : Index; Seed : Unsigned_64; Bound : Val) return Vector
    is
-      S      : Unsigned_64 := Seed;
+      G      : Generator := Abacus.Random.Seeded (Seed);
+      S      : Unsigned_64;
       Result : Vector (1 .. N);
    begin
       for I in Result'Range loop
-         S := S * Multiplier + Increment;
+         Next (G, S);
          Result (I) := Val (Raw (S / 2**7) mod (2 * Bound + 1) - Bound);
       end loop;
       return Result;

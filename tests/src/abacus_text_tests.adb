@@ -1,7 +1,10 @@
 with AUnit.Assertions; use AUnit.Assertions;
 
-with Abacus;      use Abacus;
-with Abacus.Text; use Abacus.Text;
+with Interfaces; use Interfaces;
+
+with Abacus;        use Abacus;
+with Abacus.Random; use Abacus.Random;
+with Abacus.Text;   use Abacus.Text;
 
 package body Abacus_Text_Tests is
 
@@ -142,17 +145,14 @@ package body Abacus_Text_Tests is
    --  Every value written at the most places reads back as itself.
    procedure Test_Round_Trip (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
-      type Seed is mod 2**64;
-      --  Knuth's MMIX generator: enough to spread the values.
-      Multiplier : constant := 6_364_136_223_846_793_005;
-      Increment  : constant := 1_442_695_040_888_963_407;
-      Start      : constant := 20_261_006;
-      Cases      : constant := 20_000;
-      S          : Seed := Start;
-      V          : Val;
+      Start : constant := 20_261_006;
+      Cases : constant := 20_000;
+      G     : Generator := Seeded (Start);
+      S     : Unsigned_64;
+      V     : Val;
    begin
       for I in 1 .. Cases loop
-         S := S * Multiplier + Increment;
+         Next (G, S);
          V := Val (Raw (S / 2**7) mod (2 * Val_Bound + 1) - Val_Bound);
          if I mod 2 = 0 then
             V := V / 2**(Natural (S mod 50));
