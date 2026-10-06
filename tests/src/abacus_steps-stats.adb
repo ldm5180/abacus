@@ -67,49 +67,7 @@ package body Abacus_Steps.Stats is
    function Trim (S : String) return String
    is (Ada.Strings.Fixed.Trim (S, Ada.Strings.Both));
 
-   ---------------------------------------------------------------------
-   --  Reading lists of numbers.
-   ---------------------------------------------------------------------
-
-   --  A list of numbers read from a step.
-   type Parsed is record
-      Ok     : Boolean := True;
-      Values : Vector (1 .. Max_Data) := [others => 0];
-      Count  : Data_Count := 0;
-   end record;
-
-   procedure Append (P : in out Parsed; Text : String) is
-      Got : constant Abacus.Text.Read := Abacus.Text.Parse (Trim (Text));
-   begin
-      P.Ok := P.Ok and then Got.Ok and then P.Count < Max_Data;
-      if P.Ok then
-         P.Count := P.Count + 1;
-         P.Values (P.Count) := Got.Value;
-      end if;
-   end Append;
-
-   --  The position of the next Mark in Text from From, or past its end.
-   function Next_Mark (Text, Mark : String; From : Positive) return Positive
-   is (if Ada.Strings.Fixed.Index (Text (From .. Text'Last), Mark) = 0
-       then Text'Last + 1
-       else Ada.Strings.Fixed.Index (Text (From .. Text'Last), Mark));
-
-   --  The numbers of Text, separated by commas.
-   function Parse_List (Text : String) return Parsed is
-      Result : Parsed;
-      From   : Positive := Text'First;
-      Stop   : Positive;
-   begin
-      while From <= Text'Last and then Result.Ok loop
-         Stop := Next_Mark (Text, ",", From);
-         Append (Result, Text (From .. Stop - 1));
-         From := Stop + 1;
-      end loop;
-      Result.Ok := Result.Ok and then Result.Count > 0;
-      return Result;
-   end Parse_List;
-
-   function List_Of (Ctx : Step_Context) return Parsed
+   function List_Of (Ctx : Step_Context) return Number_List
    is (Parse_List (Fabula.Args.Text (Ctx.A, 1)));
 
    function Held (Ctx : Step_Context) return Vector
@@ -232,7 +190,7 @@ package body Abacus_Steps.Stats is
    --  Rows in a step are separated by this.
    Row_Mark : constant String := " and ";
 
-   function Row_Fits (L : Window_Log; P : Parsed) return Boolean
+   function Row_Fits (L : Window_Log; P : Number_List) return Boolean
    is (P.Ok
        and then P.Count = L.Series
        and then Is_Data (P.Values (1 .. P.Count))
@@ -257,7 +215,7 @@ package body Abacus_Steps.Stats is
    end Rows_Fit;
 
    procedure Log_Row (Ctx : in out Step_Context; Text : String) is
-      P : constant Parsed := Parse_List (Text);
+      P : constant Number_List := Parse_List (Text);
       L : Window_Log renames Ctx.W.Stats.Window;
    begin
       L.Given := L.Given + 1;

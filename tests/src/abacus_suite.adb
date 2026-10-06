@@ -1,5 +1,7 @@
 with Abacus_Arith_Tests;
+with Abacus_Cholesky_Tests;
 with Abacus_Elementary_Tests;
+with Abacus_Matrices_Tests;
 with Abacus_Ieee_Tests;
 with Abacus_Quantities_Tests;
 with Abacus_Sorting_Tests;
@@ -24,6 +26,8 @@ package body Abacus_Suite is
    Sort   : aliased Abacus_Sorting_Tests.Test;
    Stats  : aliased Abacus_Stats_Tests.Test;
    Roll   : aliased Abacus_Stats_Rolling_Tests.Test;
+   Matr   : aliased Abacus_Matrices_Tests.Test;
+   Chol   : aliased Abacus_Cholesky_Tests.Test;
 
    function Suite return Access_Test_Suite is
    begin
@@ -37,6 +41,8 @@ package body Abacus_Suite is
       Add_Test (Result'Access, Sort'Access);
       Add_Test (Result'Access, Stats'Access);
       Add_Test (Result'Access, Roll'Access);
+      Add_Test (Result'Access, Matr'Access);
+      Add_Test (Result'Access, Chol'Access);
       return Result'Access;
    end Suite;
 

@@ -56,9 +56,26 @@ package Abacus_Steps is
       E_Add_Row,
       E_Remove_Oldest,
       E_Check_Fresh,
-      E_Check_Fresh_Covariance);
+      E_Check_Fresh_Covariance,
+      E_Give_Data_Matrix,
+      E_Give_Symmetric,
+      E_Factor_Gram,
+      E_Factor,
+      E_Solve,
+      E_Fit,
+      E_Check_Factors,
+      E_Check_Refused_At,
+      E_Check_Solution,
+      --  An event no pattern names: a factorization posts it, and the
+      --  next row's guard reads whether it factored.
+      E_Factor_Settled);
 
    type Hook_Kind is (Fresh_World);
+
+   --  The most data stats.feature names in one step.
+   Max_Data : constant := 64;
+
+   subtype Data_Count is Natural range 0 .. Max_Data;
 
    --  The two operands arithmetic.feature names.
    type Operand is (A, B);
@@ -88,11 +105,6 @@ package Abacus_Steps is
    type Function_Result is record
       Value : Abacus.Val := 0;
    end record;
-
-   --  The most data stats.feature names in one step.
-   Max_Data : constant := 64;
-
-   subtype Data_Count is Natural range 0 .. Max_Data;
 
    --  The most series and rows a window in stats.feature holds, and the
    --  most rows it adds or removes in all.
@@ -128,6 +140,23 @@ package Abacus_Steps is
       Window  : Window_Log;
    end record;
 
+   --  The largest matrix cholesky.feature states.
+   Max_Side : constant := 8;
+
+   subtype Side is Natural range 0 .. Max_Side;
+
+   --  The matrix cholesky.feature holds, its factor and the outcome, and
+   --  the last solution.
+   type Factoring is record
+      M        : Abacus.Matrix (1 .. Max_Side, 1 .. Max_Side) :=
+        [others => [others => 0]];
+      Rows     : Side := 0;
+      Cols     : Side := 0;
+      Refused  : Boolean := False;
+      Column   : Natural := 0;
+      Solution : Abacus.Vector (1 .. Max_Side) := [others => 0];
+   end record;
+
    --  What one scenario holds.  fabula copies it per step, so it holds
    --  values only.
    type World is record
@@ -136,6 +165,7 @@ package Abacus_Steps is
       Bits  : Pattern;
       Elem  : Function_Result;
       Stats : Table;
+      Chol  : Factoring;
    end record;
 
    --  One step as a machine sees it: the scenario, the step's arguments,
@@ -161,6 +191,21 @@ package Abacus_Steps is
 
    --  Fail the step for capture N: why it does not read as units.
    procedure Refuse_Units (Ctx : in out Step_Context; N : Positive := 1);
+
+   --  A list of numbers read from a step, separated by commas.
+   type Number_List is record
+      Ok     : Boolean := True;
+      Values : Abacus.Vector (1 .. Max_Data) := [others => 0];
+      Count  : Data_Count := 0;
+   end record;
+
+   --  The decimal numbers of Text, separated by commas; Ok False when
+   --  one does not read, there are more than Max_Data, or none.
+   function Parse_List (Text : String) return Number_List;
+
+   --  The position of the next Mark in Text from From, or past its end.
+   function Next_Mark (Text, Mark : String; From : Positive) return Positive
+   with Pre => From in Text'Range;
 
    --  Whether capture N reads as decimal text (Abacus.Text).
    function Decimal_Read
@@ -255,7 +300,21 @@ package Abacus_Steps is
       Step ("the window's sums equal a fresh window's over its rows")
                                              >= E_Check_Fresh,
       Step ("the sample covariance of series {int} and {int} is the fresh one's")
-                                             >= E_Check_Fresh_Covariance];
+                                             >= E_Check_Fresh_Covariance,
+      Step ("the matrix of observations:")   >= E_Give_Data_Matrix,
+      Step ("the symmetric matrix:")         >= E_Give_Symmetric,
+      Step ("its Gram matrix is factored with a floor of {word}")
+                                             >= E_Factor_Gram,
+      Step ("it is factored with a floor of {word}")
+                                             >= E_Factor,
+      Step ("it is solved for {}")           >= E_Solve,
+      Step ("the column {} is fitted by least squares with a ridge of {word}")
+                                             >= E_Fit,
+      Step ("it factors")                    >= E_Check_Factors,
+      Step ("the factorization is refused at column {int}")
+                                             >= E_Check_Refused_At,
+      Step ("the solution is within {word} of {}")
+                                             >= E_Check_Solution];
    --!format on
 
    Hook_Defs : constant Steps.Hook_Table := [Before >= Fresh_World];

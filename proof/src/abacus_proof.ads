@@ -1,7 +1,9 @@
 with Abacus;
 with Abacus.Arith;
+with Abacus.Cholesky;
 with Abacus.Elementary;
 with Abacus.Ieee;
+with Abacus.Matrices;
 with Abacus.Quantities;
 with Abacus.Sorting;
 with Abacus.Stats;

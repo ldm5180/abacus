@@ -7,9 +7,10 @@ package Abacus.Arith
   with SPARK_Mode, Pure
 is
 
-   --  What may be rounded: a product of two values, or a value raised to
-   --  the scale One * One, with room for the rounding bias.
-   Product_Bound : constant := 2**126;
+   --  What may be rounded: a sum of up to Max_N products of two values
+   --  less a value raised to the scale One * One, with room for the
+   --  rounding bias.
+   Product_Bound : constant := 2**126 + 2**110;
    subtype Product is Wide range -Product_Bound .. Product_Bound;
 
    --  What a quotient may be divided by: a pivot, a count, a count times

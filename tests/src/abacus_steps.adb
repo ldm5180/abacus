@@ -1,8 +1,10 @@
+with Ada.Strings.Fixed;
 with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 
 with Fabula.Numbers;
 
 with Abacus_Steps.Arithmetic;
+with Abacus_Steps.Cholesky;
 with Abacus_Steps.Elementary;
 with Abacus_Steps.Ieee;
 with Abacus_Steps.Stats;
@@ -57,6 +59,38 @@ package body Abacus_Steps is
             then Abacus.Text.Parse (Fabula.Args.Word (Ctx.A, N)).Error'Image
             else "missing"));
    end Refuse_Decimal;
+
+   function Trim (S : String) return String
+   is (Ada.Strings.Fixed.Trim (S, Ada.Strings.Both));
+
+   procedure Append (P : in out Number_List; Text : String) is
+      Got : constant Abacus.Text.Read := Abacus.Text.Parse (Trim (Text));
+   begin
+      P.Ok := P.Ok and then Got.Ok and then P.Count < Max_Data;
+      if P.Ok then
+         P.Count := P.Count + 1;
+         P.Values (P.Count) := Got.Value;
+      end if;
+   end Append;
+
+   function Next_Mark (Text, Mark : String; From : Positive) return Positive
+   is (if Ada.Strings.Fixed.Index (Text (From .. Text'Last), Mark) = 0
+       then Text'Last + 1
+       else Ada.Strings.Fixed.Index (Text (From .. Text'Last), Mark));
+
+   function Parse_List (Text : String) return Number_List is
+      Result : Number_List;
+      From   : Positive := Text'First;
+      Stop   : Positive;
+   begin
+      while From <= Text'Last and then Result.Ok loop
+         Stop := Next_Mark (Text, ",", From);
+         Append (Result, Text (From .. Stop - 1));
+         From := Stop + 1;
+      end loop;
+      Result.Ok := Result.Ok and then Result.Count > 0;
+      return Result;
+   end Parse_List;
 
    --  The largest whole number a value holds.
    Whole_Bound : constant := Abacus.Val_Bound / Abacus.One;
@@ -122,6 +156,7 @@ package body Abacus_Steps is
    Ieee_Name       : aliased constant String := "ieee";
    Elementary_Name : aliased constant String := "elementary";
    Stats_Name      : aliased constant String := "stats";
+   Cholesky_Name   : aliased constant String := "cholesky";
 
    --!format off
    Regions : constant array (Positive range <>) of Region :=
@@ -134,7 +169,9 @@ package body Abacus_Steps is
       (Elementary_Name'Access, Elementary.Offer'Access,
        Elementary.Reset'Access, Elementary.Phase'Access),
       (Stats_Name'Access, Stats.Offer'Access,
-       Stats.Reset'Access, Stats.Phase'Access)];
+       Stats.Reset'Access, Stats.Phase'Access),
+      (Cholesky_Name'Access, Cholesky.Offer'Access,
+       Cholesky.Reset'Access, Cholesky.Phase'Access)];
    --!format on
 
    --  Every region's state, for the step no region would take.
