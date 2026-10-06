@@ -1,0 +1,13 @@
+profile,what,size,ms,note
+release,dot x 100000, 180, 20.234,
+release,rank update Z Z' over 250 days, 180, 2.894,ESTIMATED
+release,factor, 180, 0.954,FACTORED
+release,solve, 180, 0.029,SOLVED
+release,qp, 180, 4.958,CERTIFIED 60 iterations
+# sink 498173614121912
+release,dot x 100000, 3000, 332.543,
+release,rank update Z Z' over 250 days, 3000, 731.409,ESTIMATED
+release,factor, 3000, 4597.169,FACTORED
+release,solve, 3000, 9.847,SOLVED
+release,qp, 3000, 10513.487,CERTIFIED 200 iterations
+# sink-9059361353498685

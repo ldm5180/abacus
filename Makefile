@@ -6,7 +6,7 @@
 TESTS := -P tests/test_abacus.gpr
 
 .PHONY: all build test features features-report prove format validation \
-	no-float shape ci clean help
+	no-float shape bench bench-build ci clean help
 
 all: build
 
@@ -73,6 +73,7 @@ format:
 	alr exec -- gnatformat --charset utf-8 -P abacus.gpr --check $$(git ls-files 'src/*.ad[sb]')
 	alr exec -- gnatformat --charset utf-8 $(TESTS) --check $$(git ls-files 'tests/src/*.ad[sb]')
 	alr exec -- gnatformat --charset utf-8 -P proof/proof.gpr --check $$(git ls-files 'proof/src/*.ad[sb]')
+	alr exec -- gnatformat --charset utf-8 -P bench/bench.gpr --check $$(git ls-files 'bench/src/*.ad[sb]')
 
 ## validation  The warnings-and-style-as-errors build CI runs: 79 columns,
 ##             `and then` in a contract.  gnatformat sees neither
@@ -90,12 +91,30 @@ no-float:
 	  echo 'no-float: a floating-point type above'; exit 1; fi; \
 	echo 'no-float: none'
 
+## bench       Build and run the benchmark: dot, rank update, factor, solve
+##             and a QP at 180 and 3,000 variables, one CSV line each.  Run
+##             it twice and keep the second: the first after a build reads
+##             high.  Numbers compare only within one sitting on one box
+bench: bench-build
+	./bench/bin/release/bench_abacus release
+
+## bench-build Compile the benchmark without running it.  `alr build
+##             --release` first, and not as a nicety: bench.gpr links
+##             abacus.gpr, which compiles with whatever profile the
+##             generated config names, and alr rewrites that on every
+##             build -- a `make prove` or a validation build between two
+##             runs would move the library from -O3 and the second run
+##             would read slower for no reason in the source
+bench-build:
+	alr build --release
+	alr exec -- gprbuild -p -j0 -P bench/bench.gpr
+
 ## shape       The subprogram-shape lint (CLAUDE.md's shape table)
 shape:
 	python3 tools/shape_check.py
 
 ## ci          Every gate, cheapest first
-ci: no-float shape format validation test features prove
+ci: no-float shape format validation test features bench-build prove
 
 ## clean       Remove all build artifacts
 clean:

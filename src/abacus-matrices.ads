@@ -2,9 +2,10 @@ with Abacus.Vectors; use Abacus.Vectors;
 
 --  Dense matrices of values, row-major, with their bounds carried by the
 --  array: the exact dot kernels every factorization and product is built
---  from, products with a vector, Gram matrices, and the mirror that
---  makes a lower triangle symmetric.  A sum of products is exact at 128
---  bits until it is rounded once.
+--  from (inlined: across units they are the inner loops), products with
+--  a vector, Gram matrices, and the mirror that makes a lower triangle
+--  symmetric.  A sum of products is exact at 128 bits until it is
+--  rounded once.
 
 package Abacus.Matrices
   with SPARK_Mode
@@ -18,6 +19,7 @@ is
    function Row_Dot
      (M : Matrix; I, J : Index; From : Positive; To : Count) return Dot_Sum
    with
+     Inline,
      Pre =>
        I in M'Range (1)
        and then J in M'Range (1)
@@ -30,6 +32,7 @@ is
      (M : Matrix; I : Index; V : Vector; From : Positive; To : Count)
       return Dot_Sum
    with
+     Inline,
      Pre =>
        I in M'Range (1)
        and then (if From <= To
@@ -42,6 +45,7 @@ is
    --  The sum over rows R of M (R, I) * M (R, J): two columns.
    function Column_Dot (M : Matrix; I, J : Index) return Dot_Sum
    with
+     Inline,
      Pre =>
        I in M'Range (2)
        and then J in M'Range (2)
@@ -51,6 +55,7 @@ is
    function Column_Vector_Dot
      (M : Matrix; I : Index; V : Vector) return Dot_Sum
    with
+     Inline,
      Pre =>
        I in M'Range (2)
        and then V'First = M'First (1)

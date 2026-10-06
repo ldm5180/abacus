@@ -1,0 +1,27 @@
+with "../abacus.gpr";
+
+--  Abacus's benchmark: a standalone main that times the kernels and the
+--  solver at 180 and 3,000 variables and prints one CSV line per
+--  measurement.  Not part of `alr build`, not part of the test suite --
+--  `make bench` builds and runs it, after `alr build --release` so the
+--  library is at -O3 whatever profile the last build left.  Language
+--  checks stay on; contracts (-gnata) are off, as in a consumer's
+--  release build.
+project Bench is
+
+   for Source_Dirs use ("src");
+   for Object_Dir use "obj/release";
+   for Exec_Dir use "bin/release";
+   for Create_Missing_Dirs use "True";
+   for Main use ("bench_abacus.adb");
+
+   package Compiler is
+      for Default_Switches ("Ada") use
+        ("-g", "-gnatwa", "-gnatwe", "-gnat2022", "-O3", "-gnatn");
+   end Compiler;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es"); --  Symbolic traceback.
+   end Binder;
+
+end Bench;
