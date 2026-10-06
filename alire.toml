@@ -1,0 +1,70 @@
+name = "abacus"
+description = "Fixed-point numerics in SPARK: statistics, linear algebra, a QP"
+version = "0.1.0"
+
+authors = ["Lenny Maiorani"]
+maintainers = ["Lenny Maiorani <639247+ldm5180@users.noreply.github.com>"]
+maintainers-logins = ["ldm5180"]
+licenses = "MIT"
+website = "https://github.com/ldm5180/abacus"
+tags = ["fixed-point", "numerics", "linear-algebra", "optimization", "spark"]
+
+project-files = ["abacus.gpr"]
+
+#  The library depends on sml alone, for its two state machines: the
+#  decimal scanner and the solver's loop.  AUnit and fabula are
+#  tests-only: abacus.gpr withs neither, so a consumer's build of the
+#  library links nothing else.
+[[depends-on]]
+sml = "*"
+aunit = "^26.0.0"
+fabula = "*"
+
+#  sml-ada is not in the community index; pin it to an exact commit so a
+#  build is reproducible from this file alone.  A consumer workspace must
+#  pin the SAME commit -- alr 2.x refuses conflicting pin links -- and
+#  it is the commit fabula's own pin brings.
+[[pins]]
+sml = { url = "https://github.com/ldm5180/sml-ada.git", commit = "3ccd0e4bf51685ebd832383c12166e795473a037" }
+#  fabula, the Gherkin runner the features under tests/features/ run on,
+#  is a TEST dependency and not in the community index either.  Pinned by
+#  commit like sml, and its own sml pin must equal the one above: alr
+#  refuses two links to one crate at different commits.
+fabula = { url = "https://github.com/ldm5180/fabula.git", commit = "746a234df5581c2e38c4202aeee8b07473fb6a51" }
+
+[build-switches]
+"*".ada_version = "Ada2022"
+
+#  `alr test` runs actions with an empty GPR_PROJECT_PATH, so each wraps its
+#  command in `alr exec --` to pick up the toolchain, sml and AUnit.  Argv-only
+#  actions (no `sh -c`, no `&&`) so this runs on Windows too; the runner exits
+#  non-zero on any failing assertion, so a failure fails the job.  The suite is
+#  built and run in both optimization modes (release -O3, debug -O0), selected
+#  by the MODE external (sml-ada convention).
+[[actions]]
+type = "test"
+command = ["alr", "exec", "--", "gprbuild", "-p", "-j0", "-XMODE=release", "-P", "tests/test_abacus.gpr"]
+
+[[actions]]
+type = "test"
+command = ["alr", "exec", "--", "tests/bin/release/test_runner"]
+
+[[actions]]
+type = "test"
+command = ["alr", "exec", "--", "gprbuild", "-p", "-j0", "-XMODE=debug", "-P", "tests/test_abacus.gpr"]
+
+[[actions]]
+type = "test"
+command = ["alr", "exec", "--", "tests/bin/debug/test_runner"]
+
+#  The Gherkin features, after the suite: each gprbuild above already
+#  built abacus_features beside test_runner.  fabula exits 1 on any
+#  failed or undefined scenario; `make features` also checks the summary
+#  line, since a missing path or an empty file exits 0 by design.
+[[actions]]
+type = "test"
+command = ["alr", "exec", "--", "tests/bin/release/abacus_features", "tests/features"]
+
+[[actions]]
+type = "test"
+command = ["alr", "exec", "--", "tests/bin/debug/abacus_features", "tests/features"]

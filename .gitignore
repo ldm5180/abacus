@@ -1,4 +1,15 @@
-/docs/tdd-log.md
+/obj/
+/lib/
+/alire/
+/config/
+/tests/obj/
+/tests/bin/
+/proof/obj/
+/bench/obj/
+/bench/bin/
+/tools/features-report/node_modules/
+
+# The spike's build products: it is kept as the record, not built here.
 /spike/obj/
 /spike/bin/
 /spike/*/obj/
@@ -6,3 +17,9 @@
 /spike/alire/
 /spike/config/
 /spike/lib/
+
+# Local-only TDD audit log: kept for traceability, never committed.
+/docs/tdd-log.md
+
+# Local Claude Code settings, not shared.
+/.claude/
