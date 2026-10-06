@@ -8,6 +8,7 @@ with Abacus.Qp;
 with Abacus.Qp.Admm;
 with Abacus.Qp.Certificate;
 with Abacus.Qp.Engine;
+with Abacus.Qp.Polish;
 with Abacus.Quantities;
 with Abacus.Random;
 with Abacus.Sorting;

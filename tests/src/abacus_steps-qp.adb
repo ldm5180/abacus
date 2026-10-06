@@ -149,7 +149,7 @@ package body Abacus_Steps.Qp is
    --  Solve the world's problem, cold or from its last answer.
    procedure Solve (G : in out Program; Warm : Boolean) is
       Pr     : constant Problem := Problem_Of (G);
-      Work   : Workspace (G.N);
+      Work   : Workspace (Pr.N, Pr.K);
       St     : State := State_Of (G, Warm);
       Result : Outcome;
    begin
@@ -202,7 +202,7 @@ package body Abacus_Steps.Qp is
 
    procedure Solve_Fixture (G : in out Program) is
       Pr   : constant Problem := Abacus_Qp_Fixtures.Load (Fixture_Name (G));
-      Work : Workspace (Pr.N);
+      Work : Workspace (Pr.N, Pr.K);
       St   : State := Cold (Pr.N, Pr.K);
    begin
       Engine.Solve (Pr, Default_Settings, Work, St, G.Result);

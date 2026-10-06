@@ -119,7 +119,7 @@ package body Bench_Runs is
 
    procedure Time_Qp (Profile : String; N : Index) is
       Pr     : Problem_Access := Program (N);
-      Work   : Workspace_Access := new Workspace (N);
+      Work   : Workspace_Access := new Workspace (N, Pr.K);
       St     : State := Cold (N, 1);
       Result : Outcome;
       Start  : constant Time := Clock;

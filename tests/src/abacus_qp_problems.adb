@@ -25,7 +25,7 @@ package body Abacus_Qp_Problems is
    function Solved
      (Pr : Problem; S : Settings; St : in out State) return Outcome
    is
-      Work   : Workspace (Pr.N);
+      Work   : Workspace (Pr.N, Pr.K);
       Result : Outcome;
    begin
       Abacus.Qp.Engine.Solve (Pr, S, Work, St, Result);

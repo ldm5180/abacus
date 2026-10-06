@@ -20,7 +20,7 @@ is
       S      : Settings;
       Work   : out Workspace;
       Result : out Prepare_Result)
-   with Pre => Work.N = Pr.N;
+   with Pre => Work.N = Pr.N and then Work.K = Pr.K;
 
    --  One iteration; Ok is False when a value left its range.
    procedure Iterate
@@ -29,7 +29,7 @@ is
       Work : Workspace;
       St   : in out State;
       Ok   : out Boolean)
-   with Pre => Work.N = Pr.N and then Fits_State (Pr, St);
+   with Pre => Fits_Work (Pr, Work) and then Fits_State (Pr, St);
 
    --  The largest primal residual (x against z, E x against z_row) and
    --  the largest dual one (P x + Q + y + E'y_row), as values at most.

@@ -79,7 +79,7 @@ is
       St     : in out State;
       Result : out Outcome)
    with
-     Pre  => Work.N = Pr.N and then Fits_State (Pr, St),
+     Pre  => Fits_Work (Pr, Work) and then Fits_State (Pr, St),
      Post =>
        (if Result = Qp.Certified then Certificate.Certified (Pr, St, S.Tol));
 

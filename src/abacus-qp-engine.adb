@@ -145,7 +145,7 @@ is
       Work : in out Workspace;
       It   : in out Iterates;
       Ctx  : in out Context)
-   with Pre => Work.N = Pr.N and then It.N = Pr.N and then It.K = Pr.K
+   with Pre => Fits_Work (Pr, Work) and then It.N = Pr.N and then It.K = Pr.K
    is
       Ok      : Boolean;
       Setup   : Admm.Prepare_Result;

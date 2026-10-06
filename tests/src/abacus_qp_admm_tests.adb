@@ -11,7 +11,7 @@ package body Abacus_Qp_Admm_Tests is
    --  a negative eigenvalue, out of range for entries that overflow.
    procedure Test_Prepare (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
-      Work   : Workspace (2);
+      Work   : Workspace (2, 1);
       Result : Prepare_Result;
    begin
       Prepare (Two (Hi => One), Default_Settings, Work, Result);
@@ -36,7 +36,7 @@ package body Abacus_Qp_Admm_Tests is
    procedure Test_Iterate (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
       Pr     : constant Problem := Two (Hi => One);
-      Work   : Workspace (2);
+      Work   : Workspace (2, 1);
       Result : Prepare_Result;
       St     : State := Cold (2, 1);
       Last   : State := St;

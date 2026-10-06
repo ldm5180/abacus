@@ -15,6 +15,12 @@ Four problems, each in the form the library takes:
   threshold t (no bounds) and the shortfalls u (100, at least zero);
   minimize t + sum (u) / (0.05 * 100) - 0.1 mu'w subject to
   r_s'w + t + u_s >= 0 and sum (w) = 1.  P is zero.
+* tail_bounded: tail with t and u boxed as a caller who knows the data
+  would pose it.  With w at least zero and summing to the budget B, a
+  scenario's loss -r_s'w lies in [-B max_j r_sj, -B min_j r_sj], so the
+  threshold t, a quantile of the losses, lies in [min_s (-B max_j r_sj),
+  max_s (-B min_j r_sj)], and u_s = max (0, loss - t) in [0, -B min_j
+  r_sj - (that least t)].  The box never binds at the answer.
 * infeasible: spread with its caps at 0.008, so 120 of them cannot
   reach the budget of one, and the first 30's limit at 0.3, clear of
   the 0.25 an even spread would give them.
@@ -108,6 +114,19 @@ def tail(rng):
     row_hi = np.concatenate([np.full(scenarios, np.inf), [1.0]])
     return dict(p=np.zeros((n, n)), q=q, lo=lo, hi=hi, e=e,
                 row_lo=row_lo, row_hi=row_hi)
+
+
+def tail_bounded(pr, columns=30, scenarios=100, budget=1.0):
+    """Tail with its threshold and shortfalls boxed by the data."""
+    r = np.asarray(pr["e"])[:scenarios, :columns]
+    worst = -budget * r.min(axis=1)
+    best = -budget * r.max(axis=1)
+    t_lo, t_hi = best.min(), worst.max()
+    lo = np.array(pr["lo"], dtype=float)
+    hi = np.array(pr["hi"], dtype=float)
+    lo[columns], hi[columns] = t_lo, t_hi
+    hi[columns + 1:] = worst - t_lo
+    return dict(pr, lo=grid(lo), hi=grid(hi))
 
 
 def solve_osqp(pr):
@@ -231,6 +250,7 @@ def main(out):
                            row_hi=np.array([1.0, 0.3])),
         "nonconvex": dict(base, p=grid(base["p"] - 2.0 * np.eye(len(base["q"])))),
     }
+    problems["tail_bounded"] = tail_bounded(problems["tail"])
     lines = ["abacus QP fixtures (written by tools/make_qp.py)",
              f"seed {SEED}; oracle OSQP eps 1e-9 polished, Clarabel 1e-12"]
     for name, pr in problems.items():

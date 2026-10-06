@@ -88,6 +88,25 @@ is
    is (Val (Quotient_Of (A, B)))
    with Pre => B /= 0 and then Fits (Quotient_Of (A, B));
 
+   --  An exponent of two a step size is taken at.
+   Widest_Exponent : constant := 30;
+   subtype Exponent is Integer range -Widest_Exponent .. Widest_Exponent;
+
+   --  The magnitude V * 2**S may reach.
+   Scaled_Bound : constant := Val_Bound * 2**Widest_Exponent;
+
+   --  V times 2**S, rounded half away from zero when S is negative.
+   function Scaled (V : Val; S : Exponent) return Wide
+   is (if S >= 0
+       then Wide (V) * Powers_Of_Two (S)
+       else Div_Round (Wide (V), Powers_Of_Two (-S)))
+   with Post => Scaled'Result in -Scaled_Bound .. Scaled_Bound;
+
+   --  W held to Lo .. Hi.
+   function Clamp (W : Wide; Lo, Hi : Val) return Val
+   is (if W <= Wide (Lo) then Lo elsif W >= Wide (Hi) then Hi else Val (W))
+   with Pre => Lo <= Hi, Post => Clamp'Result in Lo .. Hi;
+
    --  How a saturating operation ended: in range, held at the largest
    --  value of its sign, or a quotient by zero.
    type Status is (Ok, Saturated, Undefined);

@@ -6,26 +6,8 @@ package body Abacus.Qp.Certificate
   with SPARK_Mode
 is
 
-   --  A rounded row or product: at most Max_N times 2**74 and a little.
-   Grid_Bound : constant := 2**90;
-   subtype Grid is Wide range -Grid_Bound .. Grid_Bound;
-
    function Larger (A, B : Wide) return Wide
    is (if B > A then B else A);
-
-   --  How far A lies outside [Lo, Hi]; zero inside.
-   function Outside (A : Grid; Lo, Hi : Val) return Wide
-   is (if A > Wide (Hi)
-       then A - Wide (Hi)
-       elsif A < Wide (Lo)
-       then Wide (Lo) - A
-       else 0)
-   with Post => Outside'Result >= 0;
-
-   --  Row R of E times V, rounded once.
-   function Row_Of (Pr : Problem; R : Index; V : Vector) return Grid
-   is (Round_Shift (Row_Vector_Dot (Pr.E, R, V, 1, Pr.N)))
-   with Pre => R <= Pr.K and then V'First = 1 and then V'Last = Pr.N;
 
    function Primal_Residual (Pr : Problem; St : State) return Wide is
       M : Wide := 0;

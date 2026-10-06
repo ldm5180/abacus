@@ -105,12 +105,33 @@ is
         Y_Row      => [others => 0],
         Iterations => 0));
 
-   --  The matrix the iteration solves with, factored: the caller holds
-   --  it, so a large problem's factor need not live on the stack.
-   type Workspace (N : Index) is record
-      L : Matrix (1 .. N, 1 .. N);
-      D : Cholesky.Pivots (1 .. N);
+   --  Which of its bounds a constraint is held at, if either.
+   type Side is (Free, At_Lower, At_Upper);
+   type Sides is array (Index range <>) of Side;
+
+   --  What a solve works in, held by the caller so that a large
+   --  problem's need not live on the stack: the matrix the iteration
+   --  solves with, factored; and the polish's -- the bounds it holds,
+   --  the held rows of E over the free columns (A), and the two matrices
+   --  it solves with, A'A + delta P + delta**2 I and A A' + delta**2 I,
+   --  factored.
+   type Workspace
+     (N : Index;
+      K : Count)
+   is record
+      L        : Matrix (1 .. N, 1 .. N);
+      D        : Cholesky.Pivots (1 .. N);
+      Box_Side : Sides (1 .. N);
+      Row_Side : Sides (1 .. K);
+      A        : Matrix (1 .. K, 1 .. N);
+      S        : Matrix (1 .. N, 1 .. N);
+      S_D      : Cholesky.Pivots (1 .. N);
+      G        : Matrix (1 .. K, 1 .. K);
+      G_D      : Cholesky.Pivots (1 .. K);
    end record;
+
+   function Fits_Work (Pr : Problem; Work : Workspace) return Boolean
+   is (Work.N = Pr.N and then Work.K = Pr.K);
 
    --  How a solve ended.  Certified: the answer meets every tolerance.
    --  Infeasible: the duals certify that no x meets the bounds.

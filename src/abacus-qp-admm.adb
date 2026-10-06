@@ -10,19 +10,6 @@ is
    use type Cholesky.Factor_Result;
    use type Cholesky.Solve_Result;
 
-   Shifted_Bound : constant := Val_Bound * 2**Shift'Last;
-
-   --  V times 2**S, rounded half away from zero when S is negative.
-   function Shifted (V : Val; S : Shift) return Wide
-   is (if S >= 0
-       then Wide (V) * Powers_Of_Two (S)
-       else Div_Round (Wide (V), Powers_Of_Two (-S)))
-   with Post => Shifted'Result in -Shifted_Bound .. Shifted_Bound;
-
-   function Clamp (W : Wide; Lo, Hi : Val) return Val
-   is (if W <= Wide (Lo) then Lo elsif W >= Wide (Hi) then Hi else Val (W))
-   with Pre => Lo <= Hi;
-
    ---------------------------------------------------------------------
    --  Forming and factoring.
    ---------------------------------------------------------------------
@@ -35,7 +22,7 @@ is
      Pre =>
        I in 1 .. Pr.N
        and then J in 1 .. Pr.N
-       and then Diagonal in 0 .. 2 * Shifted_Bound;
+       and then Diagonal in 0 .. 2 * Scaled_Bound;
 
    --  What is added to P before it is factored: a diagonal, and the
    --  general rows' E'E times 2**Row when With_Rows.
@@ -49,7 +36,8 @@ is
    --  entry does not fit.
    procedure Form
      (Pr : Problem; A : Additions; Work : in out Workspace; Ok : out Boolean)
-   with Pre => Work.N = Pr.N and then A.Diagonal in 0 .. 2 * Shifted_Bound
+   with
+     Pre => Fits_Work (Pr, Work) and then A.Diagonal in 0 .. 2 * Scaled_Bound
    is
       Ee : Val := 0;
    begin
@@ -60,15 +48,29 @@ is
                Store (Round_Shift (Column_Dot (Pr.E, I, J)), Ee, Ok);
             end if;
             Store
-              (Plus_Diagonal (Pr, A.Diagonal, I, J) + Shifted (Ee, A.Row),
+              (Plus_Diagonal (Pr, A.Diagonal, I, J) + Scaled (Ee, A.Row),
                Work.L (I, J),
                Ok);
          end loop;
       end loop;
    end Form;
 
+   --  A workspace cleared: zeros, unit pivots, nothing held.
+   procedure Clear (Work : out Workspace) is
+   begin
+      Work.L := [others => [others => 0]];
+      Work.D := [others => 1];
+      Work.Box_Side := [others => Free];
+      Work.Row_Side := [others => Free];
+      Work.A := [others => [others => 0]];
+      Work.S := [others => [others => 0]];
+      Work.S_D := [others => 1];
+      Work.G := [others => [others => 0]];
+      Work.G_D := [others => 1];
+   end Clear;
+
    function Unit_Shift (S : Shift) return Wide
-   is (Shifted (Val (One), S));
+   is (Scaled (Val (One), S));
 
    procedure Prepare
      (Pr     : Problem;
@@ -79,8 +81,7 @@ is
       Ok      : Boolean;
       Outcome : Cholesky.Factor_Outcome;
    begin
-      Work.L := [others => [others => 0]];
-      Work.D := [others => 1];
+      Clear (Work);
       Result := Out_Of_Range;
       Form (Pr, (Unit_Shift (S.Sigma_Shift), 0, False), Work, Ok);
       if not Ok then
@@ -128,7 +129,7 @@ is
       V := [others => 0];
       for R in 1 .. Pr.K loop
          Store
-           (Shifted (St.Z_Row (R), S.Row_Shift) - Wide (St.Y_Row (R)),
+           (Scaled (St.Z_Row (R), S.Row_Shift) - Wide (St.Y_Row (R)),
             V (R),
             Ok);
       end loop;
@@ -149,9 +150,9 @@ is
       Row_Pull (Pr, S, St, V, Ok);
       for I in 1 .. Pr.N loop
          Store
-           (Shifted (St.X (I), S.Sigma_Shift)
+           (Scaled (St.X (I), S.Sigma_Shift)
             - Wide (Pr.Q (I))
-            + Shifted (St.Z (I), S.Rho_Shift)
+            + Scaled (St.Z (I), S.Rho_Shift)
             - Wide (St.Y (I))
             + Round_Shift (Column_Vector_Dot (Pr.E, I, V)),
             B (I),
@@ -178,9 +179,9 @@ is
       Store (Wide (R.Tilde) - Wide (Z), Step, Ok);
       Store (Wide (Z) + Product_Of (R.Alpha, Step), Hat, Ok);
       New_Z :=
-        Clamp (Wide (Hat) + Shifted (Y, -R.Rho), R.Lo, Val'Max (R.Lo, R.Hi));
+        Clamp (Wide (Hat) + Scaled (Y, -R.Rho), R.Lo, Val'Max (R.Lo, R.Hi));
       Store (Wide (Hat) - Wide (New_Z), Step, Ok);
-      Store (Wide (Y) + Shifted (Step, R.Rho), Y, Ok);
+      Store (Wide (Y) + Scaled (Step, R.Rho), Y, Ok);
       Z := New_Z;
    end Update;
 
@@ -222,8 +223,7 @@ is
       Ex : Val := 0;
    begin
       for R in 1 .. Pr.K loop
-         Store
-           (Round_Shift (Row_Vector_Dot (Pr.E, R, Tilde, 1, Pr.N)), Ex, Ok);
+         Store (Certificate.Row_Of (Pr, R, Tilde), Ex, Ok);
          Update
            ((Ex, Pr.Row_Lo (R), Pr.Row_Hi (R), S.Alpha, S.Row_Shift),
             St.Z_Row (R),
@@ -283,8 +283,7 @@ is
            Larger
              (M,
               Certificate.Magnitude
-                (Round_Shift (Row_Vector_Dot (Pr.E, R, St.X, 1, Pr.N))
-                 - Wide (St.Z_Row (R))));
+                (Certificate.Row_Of (Pr, R, St.X) - Wide (St.Z_Row (R))));
       end loop;
       return M;
    end Primal;
