@@ -2,6 +2,7 @@ with Abacus_Arith_Tests;
 with Abacus_Elementary_Tests;
 with Abacus_Ieee_Tests;
 with Abacus_Quantities_Tests;
+with Abacus_Sorting_Tests;
 with Abacus_Tests;
 with Abacus_Text_Tests;
 with Abacus_Vectors_Tests;
@@ -18,6 +19,7 @@ package body Abacus_Suite is
    Ieee   : aliased Abacus_Ieee_Tests.Test;
    Elem   : aliased Abacus_Elementary_Tests.Test;
    Vect   : aliased Abacus_Vectors_Tests.Test;
+   Sort   : aliased Abacus_Sorting_Tests.Test;
 
    function Suite return Access_Test_Suite is
    begin
@@ -28,6 +30,7 @@ package body Abacus_Suite is
       Add_Test (Result'Access, Ieee'Access);
       Add_Test (Result'Access, Elem'Access);
       Add_Test (Result'Access, Vect'Access);
+      Add_Test (Result'Access, Sort'Access);
       return Result'Access;
    end Suite;
 

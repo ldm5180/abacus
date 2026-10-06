@@ -5,6 +5,7 @@ with Fabula.Numbers;
 with Abacus_Steps.Arithmetic;
 with Abacus_Steps.Elementary;
 with Abacus_Steps.Ieee;
+with Abacus_Steps.Stats;
 with Abacus_Steps.Text;
 
 package body Abacus_Steps is
@@ -120,6 +121,7 @@ package body Abacus_Steps is
    Text_Name       : aliased constant String := "text";
    Ieee_Name       : aliased constant String := "ieee";
    Elementary_Name : aliased constant String := "elementary";
+   Stats_Name      : aliased constant String := "stats";
 
    --!format off
    Regions : constant array (Positive range <>) of Region :=
@@ -130,7 +132,9 @@ package body Abacus_Steps is
       (Ieee_Name'Access, Ieee.Offer'Access,
        Ieee.Reset'Access, Ieee.Phase'Access),
       (Elementary_Name'Access, Elementary.Offer'Access,
-       Elementary.Reset'Access, Elementary.Phase'Access)];
+       Elementary.Reset'Access, Elementary.Phase'Access),
+      (Stats_Name'Access, Stats.Offer'Access,
+       Stats.Reset'Access, Stats.Phase'Access)];
    --!format on
 
    --  Every region's state, for the step no region would take.

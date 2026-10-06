@@ -43,7 +43,10 @@ package Abacus_Steps is
       E_Apply,
       E_Apply_Again,
       E_Check_Square,
-      E_Check_Within);
+      E_Check_Within,
+      E_Give_Data,
+      E_Take_Quantile,
+      E_Check_Answer);
 
    type Hook_Kind is (Fresh_World);
 
@@ -76,6 +79,18 @@ package Abacus_Steps is
       Value : Abacus.Val := 0;
    end record;
 
+   --  The most data stats.feature names in one step.
+   Max_Data : constant := 64;
+
+   subtype Data_Count is Natural range 0 .. Max_Data;
+
+   --  The data stats.feature holds, and the answer it took of them.
+   type Table is record
+      Data   : Abacus.Vector (1 .. Max_Data) := [others => 0];
+      Count  : Data_Count := 0;
+      Answer : Abacus.Val := 0;
+   end record;
+
    --  What one scenario holds.  fabula copies it per step, so it holds
    --  values only.
    type World is record
@@ -83,6 +98,7 @@ package Abacus_Steps is
       Text  : Reading;
       Bits  : Pattern;
       Elem  : Function_Result;
+      Stats : Table;
    end record;
 
    --  One step as a machine sees it: the scenario, the step's arguments,
@@ -185,7 +201,11 @@ package Abacus_Steps is
       Step ("its square is {word} within {int} units")
                                              >= E_Check_Square,
       Step ("the result is {word} within {word}")
-                                             >= E_Check_Within];
+                                             >= E_Check_Within,
+      Step ("the data {}")                   >= E_Give_Data,
+      Step ("the {word} quantile is taken by the {word} rule")
+                                             >= E_Take_Quantile,
+      Step ("the answer is {word}")          >= E_Check_Answer];
    --!format on
 
    Hook_Defs : constant Steps.Hook_Table := [Before >= Fresh_World];
