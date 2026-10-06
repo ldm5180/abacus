@@ -43,7 +43,7 @@ per-element rescale ADMM needs is eleven times slower.
 | `Abacus.Ieee` | binary64 and binary32 bit patterns to a value |
 | `Abacus.Elementary` | integer root, square root, exp, log, the normal CDF and its inverse |
 | `Abacus.Vectors` | dot, sum, infinity norm, axpy, scale |
-| `Abacus.Sorting` | a stable sort with a caller's key, ranks, quantiles (nearest, linear) |
+| `Abacus.Sorting` | a stable merge sort with a caller's key over as many as 2**30 elements (`Long_Vector`), ranks, quantiles (nearest, linear) |
 | `Abacus.Stats` | means, weighted mean, variance, covariance, correlation, skewness, kurtosis, z-scores and Z Z' |
 | `Abacus.Stats.Rolling` | a window of exact sums that slides |
 | `Abacus.Matrices` | the dot kernels, products, Gram matrices |

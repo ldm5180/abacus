@@ -280,7 +280,7 @@ package body Abacus_Steps.Stats is
    end Evaluate;
 
    procedure Quantile_Of (Ctx : in out Step_Context) is
-      Sorted : Vector := Held (Ctx);
+      Sorted : Long_Vector := Long_Vector (Held (Ctx));
       Order  : Order_Array (Sorted'Range);
    begin
       Sort (Sorted, Order);

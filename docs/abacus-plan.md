@@ -417,7 +417,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
 - **RED first:** `stats.feature`, "The median of 1, 2, 3, 4 by the
   nearest rule is 3".
 - **Gates:** `make ci`, `make prove`.
-- **Done:** `Abacus.Sorting`: insertion over an order array, proved a sorted permutation in the order value, key, place.
+- **Done:** `Abacus.Sorting`: insertion over an order array, proved a sorted permutation in the order value, key, place; then a merge sort over `Long_Vector` (see the follow-ups note).
 
 ### A8 -- Statistics
 
@@ -646,7 +646,8 @@ Nothing needed an assumption or a lemma; these needed a shape:
     The normal CDF keeps Abramowitz-Stegun's 7.5e-8.  graecus's
     polynomial clamp at one was wrong for 26.2.17, whose polynomial
     reaches 1.2533.
-  - **A7:** the sort is insertion, O(n**2): 9e6 comparisons at 3,000.
+  - **A7:** the sort was insertion, O(n**2): 9e6 comparisons at 3,000
+    (replaced; see the follow-ups note).
     The quantile's postcondition says "an element" (nearest) or
     "between two neighbours" (linear); "between the least and the
     most" needs transitivity the adjacent-pair sortedness does not
@@ -702,3 +703,24 @@ Nothing needed an assumption or a lemma; these needed a shape:
     A decimal argument is read to the grid first, so the elementary
     scenarios take arguments the grid holds or state the rounding.
 
+- **Follow-ups (2026-10-06): a fast sort, and the tail program.**
+  - **The sort** is a top-down merge sort over the order array,
+    O(n log n): each half sorted, then merged through a second order the
+    caller passes (`Scratch`, so a long one can come from the heap; the
+    library allocates nothing), and a run whose halves already meet in
+    order is left as it is.  Proved at level 2 with the same contracts:
+    a permutation, sorted by (value, key, place).  The merge carries a
+    ghost witness of where each place came from, which is what proves
+    the result a permutation.  Spec changes, both for long data: the
+    sort takes `Long_Vector` and `Order_Array` over `Place` (1 ..
+    2**30), not `Vector` over `Index` -- `Max_N` bounds a 128-bit sum,
+    which a sort never forms (a `Vector` converts: `Long_Vector (V)`);
+    and `Sort_Order` and `Rank` gain an overload taking `Scratch`.  The
+    overloads without it, and `Sort`, keep their copies on the stack.
+    The unit ignores its postconditions, invariants and ghost code at
+    run time (`Assertion_Policy`): checking whether an order is a
+    permutation is a quantifier over every pair, so a build with
+    contracts on would make the sort quadratic; the preconditions are
+    still checked.  An aggregate that names its target, or an iterated
+    one, is built on the stack by GNAT; the order starts from
+    `[others => Place'First]` and a loop.
