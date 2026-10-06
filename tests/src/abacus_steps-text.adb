@@ -54,6 +54,13 @@ package body Abacus_Steps.Text is
    function Is_Error (Ctx : Step_Context) return Boolean
    is (for some E in Error_Kind => Spoken (E) = Error_Said (Ctx));
 
+   --  The text a read step names: its capture, or none for the empty
+   --  text.
+   function Text_Given (Ctx : Step_Context) return String
+   is (if Fabula.Args.Count (Ctx.A) = 0
+       then ""
+       else Fabula.Args.Text (Ctx.A, 1));
+
    function Places_Read (Ctx : Step_Context) return Boolean
    is (Units_Read (Ctx) and then Units_Of (Ctx) in 0 .. Max_Places);
 
@@ -163,7 +170,7 @@ package body Abacus_Steps.Text is
             null;
 
          when A_Read        =>
-            Ctx.W.Text.Got := Parse (Fabula.Args.Text (Ctx.A, 1));
+            Ctx.W.Text.Got := Parse (Text_Given (Ctx));
             Then_Take (Ctx, E_Text_Settled);
 
          when Check_Action  =>

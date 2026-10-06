@@ -128,6 +128,7 @@ package Abacus_Steps is
       Step ("the result is the {word} value")
                                              >= E_Check_Extreme,
       Step ("the text {string} is read")     >= E_Read_Text,
+      Step ("an empty text is read")         >= E_Read_Text,
       Step ("the text writes back as {string}")
                                              >= E_Check_Writes_Back,
       Step ("written to {int} places it is {string}")
