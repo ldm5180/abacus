@@ -6,6 +6,8 @@ with Abacus_Steps.Arithmetic;
 
 package body Abacus_Steps is
 
+   use type Abacus.Raw;
+
    procedure Then_Take (Ctx : in out Step_Context; Evt : Step_Kind) is
    begin
       Ctx.Has_Next := True;
@@ -31,6 +33,46 @@ package body Abacus_Steps is
          & " is not a whole number of units: "
          & Fabula.Numbers.Reason (Error));
    end Refuse_Units;
+
+   --  The largest whole number a value holds.
+   Whole_Bound : constant := Abacus.Val_Bound / Abacus.One;
+
+   function Whole_Read (Ctx : Step_Context; N : Positive := 1) return Boolean
+   is (Units_Read (Ctx, N) and then abs Units_Of (Ctx, N) <= Whole_Bound);
+
+   procedure Refuse_Whole (Ctx : in out Step_Context; N : Positive := 1) is
+   begin
+      if Units_Read (Ctx, N) then
+         Fabula.Check.Fail_Step
+           (Ctx.R, "a whole value is at most" & Whole_Bound'Image);
+      else
+         Refuse_Units (Ctx, N);
+      end if;
+   end Refuse_Whole;
+
+   function Ratio_Read (Ctx : Step_Context; N : Positive := 1) return Boolean
+   is (Whole_Read (Ctx, N)
+       and then Whole_Read (Ctx, N + 1)
+       and then Units_Of (Ctx, N + 1) /= 0);
+
+   function Ratio_Of (Ctx : Step_Context; N : Positive := 1) return Abacus.Val
+   is (Abacus.Arith.Div
+         (Units_Of (Ctx, N) * Abacus.One, Units_Of (Ctx, N + 1) * Abacus.One));
+
+   procedure Refuse_Ratio (Ctx : in out Step_Context; N : Positive := 1) is
+   begin
+      if not Units_Read (Ctx, N) then
+         Refuse_Units (Ctx, N);
+      elsif not Units_Read (Ctx, N + 1) then
+         Refuse_Units (Ctx, N + 1);
+      else
+         Fabula.Check.Fail_Step
+           (Ctx.R,
+            "a fraction needs whole parts of at most"
+            & Whole_Bound'Image
+            & " and a denominator that is not zero");
+      end if;
+   end Refuse_Ratio;
 
    ---------------------------------------------------------------------
    --  The features as orthogonal regions: every step is offered to each,

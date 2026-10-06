@@ -4,6 +4,7 @@ with Fabula.Frames;
 with Fabula.Registry;
 
 with Abacus;
+with Abacus.Arith;
 
 --  The step registry the feature runner dispatches on: one Step_Kind
 --  per pattern, one table that reads like the features, and one Execute
@@ -13,14 +14,38 @@ package Abacus_Steps is
 
    --  The steps, grouped by the feature that reads them.  Each is an
    --  event of that feature's state machine, in its own child package.
-   type Step_Kind is (E_Check_One);
+   type Step_Kind is
+     (E_Check_One,
+      E_Give_Units,
+      E_Give_Whole,
+      E_Give_Ratio,
+      E_Multiply,
+      E_Divide,
+      E_Check_Units,
+      E_Check_Ratio,
+      E_Check_Status,
+      E_Check_Extreme);
 
    type Hook_Kind is (Fresh_World);
+
+   --  The two operands arithmetic.feature names.
+   type Operand is (A, B);
+
+   type Operand_Values is array (Operand) of Abacus.Val;
+   type Operand_Flags is array (Operand) of Boolean;
+
+   --  Arithmetic's operands, the ones given so far, and the last result
+   --  with its status.
+   type Sums is record
+      Value  : Operand_Values := [others => 0];
+      Given  : Operand_Flags := [others => False];
+      Result : Abacus.Arith.Checked;
+   end record;
 
    --  What one scenario holds.  fabula copies it per step, so it holds
    --  values only.
    type World is record
-      Result : Abacus.Raw := 0;
+      Arith : Sums;
    end record;
 
    --  One step as a machine sees it: the scenario, the step's arguments,
@@ -47,6 +72,24 @@ package Abacus_Steps is
    --  Fail the step for capture N: why it does not read as units.
    procedure Refuse_Units (Ctx : in out Step_Context; N : Positive := 1);
 
+   --  Whether capture N reads as a whole number a value holds.
+   function Whole_Read (Ctx : Step_Context; N : Positive := 1) return Boolean;
+
+   --  Fail the step for capture N: why it is not a whole value.
+   procedure Refuse_Whole (Ctx : in out Step_Context; N : Positive := 1);
+
+   --  Whether captures N and N + 1 read as a fraction whose numerator
+   --  and denominator are whole values and whose denominator is not
+   --  zero.
+   function Ratio_Read (Ctx : Step_Context; N : Positive := 1) return Boolean;
+
+   --  The value nearest the fraction captures N and N + 1 spell.
+   function Ratio_Of (Ctx : Step_Context; N : Positive := 1) return Abacus.Val
+   with Pre => Ratio_Read (Ctx, N);
+
+   --  Fail the step for the fraction at captures N and N + 1.
+   procedure Refuse_Ratio (Ctx : in out Step_Context; N : Positive := 1);
+
    package Steps is new
      Fabula.Registry
        (Step_Kind => Step_Kind,
@@ -56,7 +99,19 @@ package Abacus_Steps is
 
    --!format off
    Step_Defs : constant Steps.Step_Table :=
-     [Step ("one is {int} units")            >= E_Check_One];
+     [Step ("the value one is {int} units")  >= E_Check_One,
+      Step ("{word} is {int} units")         >= E_Give_Units,
+      Step ("{word} is {int}")               >= E_Give_Whole,
+      Step ("{word} is {int} over {int}")    >= E_Give_Ratio,
+      Step ("{word} is multiplied by {word}")
+                                             >= E_Multiply,
+      Step ("{word} is divided by {word}")   >= E_Divide,
+      Step ("the result is {int} units")     >= E_Check_Units,
+      Step ("the result is {int} over {int}")
+                                             >= E_Check_Ratio,
+      Step ("the result is {word}")          >= E_Check_Status,
+      Step ("the result is the {word} value")
+                                             >= E_Check_Extreme];
    --!format on
 
    Hook_Defs : constant Steps.Hook_Table := [Before >= Fresh_World];
