@@ -4,6 +4,7 @@ with Abacus.Elementary;
 with Abacus.Ieee;
 with Abacus.Quantities;
 with Abacus.Text;
+with Abacus.Vectors;
 
 --  gnatprove analyses a unit only when it is in the closure of the
 --  project's sources.  This package withs every Abacus unit so one
