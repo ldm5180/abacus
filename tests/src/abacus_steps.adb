@@ -3,6 +3,7 @@ with Ada.Strings.Unbounded; use Ada.Strings.Unbounded;
 with Fabula.Numbers;
 
 with Abacus_Steps.Arithmetic;
+with Abacus_Steps.Text;
 
 package body Abacus_Steps is
 
@@ -94,11 +95,14 @@ package body Abacus_Steps is
    end record;
 
    Arithmetic_Name : aliased constant String := "arithmetic";
+   Text_Name       : aliased constant String := "text";
 
    --!format off
    Regions : constant array (Positive range <>) of Region :=
      [(Arithmetic_Name'Access, Arithmetic.Offer'Access,
-       Arithmetic.Reset'Access, Arithmetic.Phase'Access)];
+       Arithmetic.Reset'Access, Arithmetic.Phase'Access),
+      (Text_Name'Access, Text.Offer'Access,
+       Text.Reset'Access, Text.Phase'Access)];
    --!format on
 
    --  Every region's state, for the step no region would take.

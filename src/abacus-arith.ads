@@ -12,9 +12,9 @@ is
    Product_Bound : constant := 2**126;
    subtype Product is Wide range -Product_Bound .. Product_Bound;
 
-   --  What a quotient may be divided by: a pivot, a count, or a count
-   --  times One.
-   Divisor_Bound : constant := 2**64;
+   --  What a quotient may be divided by: a pivot, a count, a count times
+   --  One, or a power of ten.
+   Divisor_Bound : constant := 2**96;
    subtype Divisor is Wide range 1 .. Divisor_Bound;
 
    --  N / D rounded to nearest, ties away from zero: the one rounding

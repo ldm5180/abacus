@@ -79,12 +79,16 @@ format:
 validation:
 	alr --non-interactive build --validation
 
-## no-float    No floating-point type anywhere in the crate's Ada
+## no-float    No floating-point type anywhere in the crate's Ada.  Comments
+##             are stripped first: a comment may say "float", code may not
 no-float:
-	@! grep -rniE '\b(long_|short_)*float\b|\bis\s+digits\b|elementary_functions' \
-	  --include='*.ad[sb]' src tests/src proof/src $$(ls -d bench/src 2>/dev/null) \
-	  || { echo 'no-float: a floating-point type above'; exit 1; }
-	@echo 'no-float: none'
+	@hits=$$(for f in $$(find src tests/src proof/src bench/src -name '*.ad[sb]' \
+	    2>/dev/null); do sed 's/--.*//' $$f | \
+	  grep -niE '\b(long_|short_)*float\b|\bis\s+digits\b|elementary_functions' | \
+	  sed "s|^|$$f:|"; done); \
+	if [ -n "$$hits" ]; then echo "$$hits"; \
+	  echo 'no-float: a floating-point type above'; exit 1; fi; \
+	echo 'no-float: none'
 
 ## shape       The subprogram-shape lint (CLAUDE.md's shape table)
 shape:

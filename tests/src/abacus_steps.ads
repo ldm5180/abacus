@@ -5,6 +5,7 @@ with Fabula.Registry;
 
 with Abacus;
 with Abacus.Arith;
+with Abacus.Text;
 
 --  The step registry the feature runner dispatches on: one Step_Kind
 --  per pattern, one table that reads like the features, and one Execute
@@ -24,7 +25,15 @@ package Abacus_Steps is
       E_Check_Units,
       E_Check_Ratio,
       E_Check_Status,
-      E_Check_Extreme);
+      E_Check_Extreme,
+      E_Read_Text,
+      E_Text_Settled,
+      E_Check_Writes_Back,
+      E_Check_Written,
+      E_Check_Read_Units,
+      E_Check_Read_Ratio,
+      E_Check_Refused,
+      E_Check_Position);
 
    type Hook_Kind is (Fresh_World);
 
@@ -42,10 +51,16 @@ package Abacus_Steps is
       Result : Abacus.Arith.Checked;
    end record;
 
+   --  The text text.feature last read, and what it read as.
+   type Reading is record
+      Got : Abacus.Text.Read;
+   end record;
+
    --  What one scenario holds.  fabula copies it per step, so it holds
    --  values only.
    type World is record
       Arith : Sums;
+      Text  : Reading;
    end record;
 
    --  One step as a machine sees it: the scenario, the step's arguments,
@@ -111,7 +126,18 @@ package Abacus_Steps is
                                              >= E_Check_Ratio,
       Step ("the result is {word}")          >= E_Check_Status,
       Step ("the result is the {word} value")
-                                             >= E_Check_Extreme];
+                                             >= E_Check_Extreme,
+      Step ("the text {string} is read")     >= E_Read_Text,
+      Step ("the text writes back as {string}")
+                                             >= E_Check_Writes_Back,
+      Step ("written to {int} places it is {string}")
+                                             >= E_Check_Written,
+      Step ("the text reads as {int} units") >= E_Check_Read_Units,
+      Step ("the text reads as {int} over {int}")
+                                             >= E_Check_Read_Ratio,
+      Step ("the text is refused as {}")     >= E_Check_Refused,
+      Step ("the refusal is at position {int}")
+                                             >= E_Check_Position];
    --!format on
 
    Hook_Defs : constant Steps.Hook_Table := [Before >= Fresh_World];
