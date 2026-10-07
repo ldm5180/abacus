@@ -7,7 +7,9 @@ with Abacus.Qp.Certificate;
 --  is a vertex, it creeps; the polish turns that tail into a few solves.
 --  The solves go through the Cholesky factorization: the held rows by a
 --  regularized system refined against the exact one, their multipliers
---  by least squares.
+--  by least squares.  A cone is curved, and cannot be held as an
+--  equality: its rows are never held, and a problem with one is not
+--  polished.
 
 package Abacus.Qp.Polish
   with SPARK_Mode
@@ -15,7 +17,8 @@ is
 
    --  Work's sides read off St, OSQP's rule: a bound is held when the
    --  constraint lies nearer to it than its multiplier pulls toward it.
-   --  An equality row is always held; an open bound never.
+   --  An equality row is always held; an open bound never, nor a cone's
+   --  row.
    procedure Read_Held (Pr : Problem; St : State; Work : in out Workspace)
    with Pre => Fits_Work (Pr, Work) and then Fits_State (Pr, St);
 
@@ -54,6 +57,7 @@ is
    --  St polished: Passed when the problem solved with the bounds St
    --  holds, or with up to Max_Corrections corrections of them, is
    --  certified, and St is then that answer; otherwise St is as it was.
+   --  A problem with a cone is not polished.
    procedure Run
      (Pr     : Problem;
       S      : Settings;

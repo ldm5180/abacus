@@ -146,6 +146,22 @@ package body Abacus_Qp_Polish_Tests is
       Assert (St = Cold (Pr.N, Pr.K), "the iterate kept");
    end Test_Refused;
 
+   --  A cone's rows are never held: a polish holds bounds as equalities,
+   --  and a cone is curved.  A problem with a cone is not polished.
+   procedure Test_Cone_Not_Held (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Pr     : constant Problem := Disc ([-One, -One], One);
+      Work   : Workspace (2, 3);
+      St     : State := Disc_Answer;
+      Passed : Boolean;
+   begin
+      Read_Held (Pr, St, Work);
+      Assert (Work.Row_Side = [Free, Free, Free], "no cone row held");
+      Run (Pr, Default_Settings, Work, St, Passed);
+      Assert (not Passed and then St = Disc_Answer, "not polished");
+   end Test_Cone_Not_Held;
+
    overriding
    procedure Register_Tests (T : in out Test) is
       use AUnit.Test_Cases.Registration;
@@ -155,6 +171,8 @@ package body Abacus_Qp_Polish_Tests is
       Register_Routine (T, Test_Vertex'Access, "A vertex, exactly");
       Register_Routine (T, Test_Tail'Access, "The boxed tail program");
       Register_Routine (T, Test_Refused'Access, "A polish refused");
+      Register_Routine
+        (T, Test_Cone_Not_Held'Access, "A cone is neither held nor polished");
    end Register_Tests;
 
    overriding

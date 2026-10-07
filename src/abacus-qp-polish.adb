@@ -1,6 +1,7 @@
 with Abacus.Arith;    use Abacus.Arith;
 with Abacus.Cholesky;
 with Abacus.Matrices; use Abacus.Matrices;
+with Abacus.Qp.Cones;
 
 package body Abacus.Qp.Polish
   with SPARK_Mode
@@ -44,7 +45,11 @@ is
       end loop;
       for R in 1 .. Pr.K loop
          Work.Row_Side (R) :=
-           Side_Of (St.Z_Row (R), St.Y_Row (R), Pr.Row_Lo (R), Pr.Row_Hi (R));
+           (if Cones.In_Cone (Pr, R)
+            then Free
+            else
+              Side_Of
+                (St.Z_Row (R), St.Y_Row (R), Pr.Row_Lo (R), Pr.Row_Hi (R)));
       end loop;
    end Read_Held;
 
@@ -567,7 +572,7 @@ is
          end if;
       end loop;
       for R in 1 .. Pr.K loop
-         if not Is_Held_Row (Work, R) then
+         if not Is_Held_Row (Work, R) and then not Cones.In_Cone (Pr, R) then
             Keep_Larger
               (P,
                (Certificate.Outside
@@ -614,6 +619,9 @@ is
       Changed : Boolean;
    begin
       Passed := False;
+      if Cones.Has_Cone (Pr) then
+         return;
+      end if;
       Read_Held (Pr, St, Work);
       for Round in 0 .. Max_Corrections loop
          Solve_Held (Pr, Work, St, Cand, Ok);

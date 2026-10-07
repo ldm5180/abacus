@@ -289,9 +289,8 @@ package body Abacus_Qp_Engine_Tests is
    --  puts the answer on the boundary at the root of a half each.
    procedure Test_Disc (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
-      Root_Half : constant := 777_472_127_994;
-      Pr        : constant Problem := Disc ([-One, -One], One);
-      St        : State := Cold (2, 3);
+      Pr : constant Problem := Disc ([-One, -One], One);
+      St : State := Cold (2, 3);
    begin
       Assert (Solved (Pr, Default_Settings, St) = Certified, "certified");
       Near (St.X (1), Root_Half, "x1");

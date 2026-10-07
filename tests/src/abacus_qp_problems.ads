@@ -23,6 +23,24 @@ package Abacus_Qp_Problems is
      (Q : Vector; Radius : Val; Lo : Val := No_Lower; Hi : Val := No_Upper)
       return Problem;
 
+   --  The root of a half, on the grid: each coordinate of the disc's
+   --  answer.
+   Root_Half : constant Val := 777_472_127_994;
+
+   --  The answer of Disc ([-One, -One], One): minimize -x1 - x2 with
+   --  ||x|| <= 1 is x = (r, r), r the root of a half; the cone's
+   --  multipliers are (-2 r, 1, 1): the tail ones balance the objective,
+   --  the head one makes their inner product with the rows, (1, r, r),
+   --  zero.
+   function Disc_Answer return State
+   is ((N          => 2,
+        K          => 3,
+        X | Z      => [Root_Half, Root_Half],
+        Y          => [0, 0],
+        Z_Row      => [0, Root_Half, Root_Half],
+        Y_Row      => [-2 * Root_Half, One, One],
+        Iterations => 0));
+
    --  Two with P given in place of the identity.
    function With_P (Pr : Problem; P : Matrix) return Problem
    with Pre => P'Length (1) = Pr.N and then P'Length (2) = Pr.N;

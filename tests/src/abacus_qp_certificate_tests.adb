@@ -94,25 +94,8 @@ package body Abacus_Qp_Certificate_Tests is
       Assert (not Unbounded (Pr, St, Last, 16), "the objective rises");
    end Test_Unbounded;
 
-   --  The root of a half, on the grid: each coordinate of the disc's
-   --  answer.
-   Root_Half : constant Val := 777_472_127_994;
-
    --  The root of 2 less one, on the grid.
    Root_2_Less_1 : constant := 455_432_628_212;
-
-   --  The disc's answer: minimize -x1 - x2 with ||x|| <= 1 is x = (r, r),
-   --  r the root of a half; the cone's multipliers are (-2 r, 1, 1): the
-   --  tail ones balance the objective, the head one makes their
-   --  inner product with the rows, (1, r, r), zero.
-   function Disc_Answer return State
-   is ((N          => 2,
-        K          => 3,
-        X | Z      => [Root_Half, Root_Half],
-        Y          => [0, 0],
-        Z_Row      => [One, Root_Half, Root_Half],
-        Y_Row      => [-2 * Root_Half, One, One],
-        Iterations => 0));
 
    --  A point outside the cone, and multipliers outside its polar, are
    --  each measured, and refuse the certificate.
