@@ -1,7 +1,11 @@
+with Ada.Unchecked_Deallocation;
+
 with Interfaces; use Interfaces;
 
 with AUnit.Assertions; use AUnit.Assertions;
 
+with Abacus;
+use type Abacus.Raw;
 with Abacus.Sobol; use Abacus.Sobol;
 
 with Abacus_Sobol_Fixtures;
@@ -149,6 +153,96 @@ package body Abacus_Sobol_Tests is
       Assert (Differs = Draws, "two seeds, two streams:" & Differs'Image);
    end Test_Seeds;
 
+   type Block_Access is access Block;
+
+   procedure Free is new Ada.Unchecked_Deallocation (Block, Block_Access);
+
+   --  Whether coordinate J of B, cut into 2**M equal intervals, has
+   --  exactly one point in each: then no two points share an interval.
+   function Column_Stratified
+     (B : Block; M : Block_Exponent; J : Dimension) return Boolean
+   is
+      type Seen is array (Unsigned_32 range <>) of Boolean;
+      Hit  : Seen (0 .. 2**M - 1) := [others => False];
+      Cell : Unsigned_32;
+   begin
+      for I in B'Range (1) loop
+         Cell := Shift_Right (B (I, J), Bits - M);
+         if Hit (Cell) then
+            return False;
+         end if;
+         Hit (Cell) := True;
+      end loop;
+      return True;
+   end Column_Stratified;
+
+   --  Whether every coordinate of B, 2**M points, is stratified.
+   function Stratified (B : Block; M : Block_Exponent) return Boolean
+   is (for all J in B'Range (2) => Column_Stratified (B, M, J));
+
+   --  Two blocks of 2**10 points in 12 dimensions, scrambled: each puts
+   --  one point in each of 2**10 equal intervals of every coordinate, and
+   --  they are the points Next gives.
+   procedure Test_Blocks (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      M      : constant := 10;
+      D      : constant := 12;
+      S      : Sequence := Abacus.Sobol.Scrambled (D, 7);
+      One_By : Sequence := Abacus.Sobol.Scrambled (D, 7);
+      B      : Block_Access := new Block (1 .. 2**M, 1 .. D);
+      X      : Point (1 .. D);
+      Result : Block_Result;
+      Ok     : Boolean;
+   begin
+      for Round in 1 .. 2 loop
+         Next_Block (S, M, B.all, Result);
+         Assert (Result = Filled, "filled");
+         Assert (Stratified (B.all, M), "stratified, block" & Round'Image);
+         for I in B'Range (1) loop
+            Next (One_By, X, Ok);
+            Assert
+              ((for all J in 1 .. D => B (I, J) = X (J)), "point" & I'Image);
+         end loop;
+      end loop;
+      Assert (Drawn (S) = 2 * 2**M, "two blocks drawn");
+      Free (B);
+   end Test_Blocks;
+
+   --  A block that does not start at a multiple of its size, or that
+   --  starts past the last point, is refused by name and the sequence
+   --  left.  An aligned block that starts before the end fits: 2**32 is a
+   --  multiple of every block's size.
+   procedure Test_Block_Refused (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      S      : Sequence := Abacus.Sobol.Scrambled (2, 7);
+      B      : Block (1 .. 8, 1 .. 2);
+      Four   : Block (1 .. 4, 1 .. 2);
+      X      : Point (1 .. 2);
+      Result : Block_Result;
+      Ok     : Boolean;
+   begin
+      Next (S, X, Ok);
+      Next_Block (S, 3, B, Result);
+      Assert (Result = Misaligned and then Drawn (S) = 1, "misaligned");
+      Skip (S, Period - 5, Ok);
+      Next_Block (S, 2, Four, Result);
+      Assert (Result = Filled and then Drawn (S) = Period, "the last four");
+      Next_Block (S, 3, B, Result);
+      Assert (Result = Past_End and then Drawn (S) = Period, "past the end");
+   end Test_Block_Refused;
+
+   --  A coordinate as a value on the grid: over 2**32 is over 2**40, a
+   --  shift by eight, so every coordinate is a value in [0, 1).
+   procedure Test_Unit (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      use Abacus;
+   begin
+      Assert (Unit (0) = 0, "zero");
+      Assert (Unit (2**31) = One / 2, "a half");
+      Assert (Unit (Coordinate'Last) = One - 2**8, "the last below one");
+   end Test_Unit;
+
    overriding
    procedure Register_Tests (T : in out Test) is
       use AUnit.Test_Cases.Registration;
@@ -164,6 +258,9 @@ package body Abacus_Sobol_Tests is
       Register_Routine
         (T, Test_Scrambled'Access, "The scramble, as a second implementation");
       Register_Routine (T, Test_Seeds'Access, "One seed, one stream");
+      Register_Routine (T, Test_Blocks'Access, "Blocks of 2**k, stratified");
+      Register_Routine (T, Test_Block_Refused'Access, "A block refused");
+      Register_Routine (T, Test_Unit'Access, "A coordinate as a value");
    end Register_Tests;
 
    overriding

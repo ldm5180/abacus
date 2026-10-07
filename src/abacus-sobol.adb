@@ -184,4 +184,51 @@ is
       S.Count := S.Count + 1;
    end Next;
 
+   --  B's rows filled by Next, every one of them a point: the caller has
+   --  shown that as many remain.
+   procedure Fill (S : in out Sequence; B : out Block)
+   with
+     Pre  =>
+       B'First (1) = 1
+       and then B'Last (1) >= 1
+       and then B'First (2) = 1
+       and then B'Last (2) = S.D
+       and then Point_Count (B'Last (1)) <= Period - Drawn (S),
+     Post => Drawn (S) = Drawn (S'Old) + Point_Count (B'Last (1))
+   is
+      D  : constant Dimension := S.D;
+      X  : Point (1 .. D);
+      Ok : Boolean;
+   begin
+      B := [others => [others => 0]];
+      for I in B'Range (1) loop
+         Next (S, X, Ok);
+         pragma Assert (Ok);
+         for J in X'Range loop
+            B (I, J) := X (J);
+         end loop;
+         pragma
+           Loop_Invariant (Drawn (S) = Drawn (S'Loop_Entry) + Point_Count (I));
+      end loop;
+   end Fill;
+
+   procedure Next_Block
+     (S      : in out Sequence;
+      M      : Block_Exponent;
+      B      : out Block;
+      Result : out Block_Result)
+   is
+      Size : constant Point_Count := Point_Count (Block_Size (M));
+   begin
+      B := [others => [others => 0]];
+      if S.Count mod Size /= 0 then
+         Result := Misaligned;
+      elsif Period - S.Count < Size then
+         Result := Past_End;
+      else
+         Fill (S, B);
+         Result := Filled;
+      end if;
+   end Next_Block;
+
 end Abacus.Sobol;

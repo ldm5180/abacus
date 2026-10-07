@@ -66,6 +66,48 @@ is
        Ok = (Count <= Period - Drawn (S'Old))
        and then (if Ok then Drawn (S) = Drawn (S'Old) + Count else S = S'Old);
 
+   --  A block of 2**M points, one per row: M up to 30.
+   Max_Block_Exponent : constant := 30;
+   subtype Block_Exponent is Natural range 0 .. Max_Block_Exponent;
+
+   function Block_Size (M : Block_Exponent) return Positive
+   is (2**M);
+
+   type Block is array (Positive range <>, Dimension range <>) of Coordinate;
+
+   --  How a block was drawn: filled; refused because the count drawn is
+   --  not a multiple of the block's size, so its points would not be
+   --  stratified; or refused because every point has been drawn.  An
+   --  aligned block that starts before the end always fits, 2**32 being a
+   --  multiple of its size.
+   type Block_Result is (Filled, Misaligned, Past_End);
+
+   --  The next 2**M points into B's rows, as scipy's random_base2 draws
+   --  them.  A filled block of a sequence drawn so far in whole blocks
+   --  puts one point in each of 2**M equal intervals of every
+   --  coordinate.  Refused, S is left as it was.
+   procedure Next_Block
+     (S      : in out Sequence;
+      M      : Block_Exponent;
+      B      : out Block;
+      Result : out Block_Result)
+   with
+     Pre  =>
+       B'First (1) = 1
+       and then B'Last (1) = Block_Size (M)
+       and then B'First (2) = 1
+       and then B'Last (2) = S.D,
+     Post =>
+       (if Result = Filled
+        then Drawn (S) = Drawn (S'Old) + Point_Count (Block_Size (M))
+        else S = S'Old);
+
+   --  A coordinate as a value on the grid, in [0, 1): over 2**32 is over
+   --  2**40, a shift by eight.
+   function Unit (C : Coordinate) return Val
+   is (Val (C) * 2**(Frac - Bits))
+   with Post => Unit'Result in 0 .. One - 1;
+
 private
 
    subtype Digit is Positive range 1 .. Bits;
