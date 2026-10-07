@@ -3,8 +3,8 @@
 Fixed-point numerics for Ada 2022, proved in SPARK: arithmetic on
 scaled integers, decimal text and IEEE-754 bit patterns, elementary
 functions, vectors, sorting and quantiles, statistics, dense linear
-algebra, a quadratic-program solver with a certificate, and a seeded
-generator.  No floating-point type appears anywhere in it.
+algebra, a solver for quadratic and second-order cone programs with a
+certificate, a seeded generator, and scrambled Sobol sequences.  No floating-point type appears anywhere in it.
 
 The name is the counting board: arithmetic done with whole beads.
 
@@ -51,9 +51,11 @@ per-element rescale ADMM needs is eleven times slower.
 | `Abacus.Qp` | the problem, its settings, tolerances, state and outcomes |
 | `Abacus.Qp.Admm` | the iteration and the checks between iterations |
 | `Abacus.Qp.Certificate` | the residuals, `Certified`, and the infeasibility certificates |
+| `Abacus.Qp.Cones` | the second-order cone over a run of a vector: its norm (the proved integer root), the projection onto it and its polar, how far outside |
 | `Abacus.Qp.Polish` | the held bounds read off an iterate, the problem solved with them held, one correction at a time |
 | `Abacus.Qp.Engine` | the solver's loop, an sml machine, and `Solve` |
 | `Abacus.Random` | SplitMix64 with an explicit state, and `Below` without bias |
+| `Abacus.Sobol` | Sobol sequences in up to 64 dimensions from Joe and Kuo's direction numbers, scrambled from a seed, in Gray-code order, with `Skip` and blocks of 2**M points |
 
 ## Outcomes, never exceptions
 
@@ -70,6 +72,9 @@ what happened:
 - `Cholesky.Factor_Outcome`: `Factored`, or `Not_Positive_Definite` or
   `Out_Of_Range` with the column it failed at; the pivot floor is the
   caller's.
+- `Sobol.Next` and `Sobol.Skip`: `Ok`, cleared once the 2**32 points
+  are drawn; `Sobol.Block_Result`: `Filled`, `Misaligned` (a block that
+  does not start at a multiple of its size), `Past_End`.
 - `Qp.Outcome`: `Certified`, `Infeasible`, `Unbounded`, `Not_Convex`,
   `Stalled`, `Exhausted`, `Diverged`.
 
@@ -118,11 +123,62 @@ rows) at 900 iterations (0.30 s), within 7.5e-9.  `Polish_Every => 0`
 turns it off, and the tail program then ends `Exhausted`, never
 `Certified`.
 
+**Second-order cones.**  A run of general rows may lie in a cone
+instead of an interval: `Problem.Kind` marks a row `Cone_Head` (it
+begins a cone) or `Cone_Tail` (it continues the one above), and the
+cone's rows of E x, less their `Row_Lo` -- the cone's vertex -- lie in
+{(s, u) : ||u|| <= s}, s the head's.  So ||G x + g|| <= h'x + h0 is a
+head row h' with `Row_Lo` -h0 and the rows of G with `Row_Lo` -g;
+`Row_Hi` is not read.  Every row defaults to `Interval`, so a problem
+posed without kinds is a QP as before.  The iteration projects a cone's
+rows onto it in closed form (kept inside, zero inside its polar, else
+scaled to the boundary), the norm the proved integer root of an exact
+sum of squares.  A certified answer is also held to how far its rows lie
+outside their cones (the primal tolerance) and its multipliers outside
+the cones' polars (the dual one), and to each cone's complementarity.
+The infeasibility and unboundedness certificates project the duals'
+change onto each cone's polar and ask a receding direction to stay in
+its cones.  The polish does not handle cones: a problem with one is not
+polished, and its answer is ADMM's.
+
+The deviation program -- maximize the mean of P w less 75 times its
+standard deviation, ||(P - 1 m') w|| / sqrt (T), for 1,500 outcomes of
+14 columns, 0 <= w <= 20, sum w = 10, posed as minimize -m'w + 75 t
+with the deviation at most t, a cone of 1,501 rows
+(`tests/data/qp_deviation.txt`, from `tools/make_socp.py`) -- is certified from
+cold with the default settings at 610 iterations in 72 ms, its weights
+within 9.5e-11 of the exact answer (Clarabel's are 4.1e-6 from it,
+ECOS's 1.5e-7).  A caller brings such data inside the values by
+dividing the whole table by one positive constant, which leaves w where
+it was.  Its workspace is 18 MB, mostly the polish's K by K matrix, so
+it belongs on the heap.  The same cone over the 14 by 14 factor of G'G
+(||G w|| = ||L' w||) is 16 rows: 620 iterations in 2.1 ms, as close.
+
+## Scrambled Sobol sequences
+
+`Abacus.Sobol` gives points in [0, 1)**d, d up to 64, each coordinate an
+integer over 2**32 (`Unit` puts one on the grid).  The direction numbers
+are Joe and Kuo's, criterion D(6), for the first 64 dimensions, kept
+with their licence under `tools/sobol/` and made into
+`src/abacus-sobol-directions.ads` by `tools/make_sobol.py`; nothing is
+fetched to build.  Points come in Gray-code order; `Skip` reaches any
+index at once.  `Scrambled (D, Seed)` is scipy's method -- a random
+unit lower-triangular binary matrix applied to each dimension's
+direction numbers and a random digital shift -- drawn from
+`Abacus.Random`, so the stream is abacus's, not scipy's.  `Next_Block
+(M)` draws the next 2**M points, as scipy's `random_base2` does; a block
+that starts at a multiple of its size puts one point in each of 2**M
+equal intervals of every coordinate.  The first 64 points in 64
+dimensions and points at far indices up to the last equal scipy's
+unscrambled ones; a scrambled block's L2-star discrepancy equals
+scipy's for the same points and lies within what scipy's own scrambled
+points reach over 64 seeds.  A sequence is an object the caller holds.
+
 ## What is proved and what is checked
 
 `make prove` runs gnatprove at level 2 with `--checks-as-errors=on` over
-every unit in `src/`: no `pragma Assume`, no `SPARK_Mode Off`; 1,804
-checks, all proved, in 2 min 43 s from a clean object directory (gnatprove 15,
+every unit in `src/`: no `pragma Assume`, no `SPARK_Mode Off`; 2,124
+checks, all proved, in 2 min 26 s from a clean object directory (gnatprove 15,
 `-j0`).  Proved:
 
 - absence of run-time errors everywhere: no overflow, no range or index
@@ -136,7 +192,9 @@ checks, all proved, in 2 min 43 s from a clean object directory (gnatprove 15,
   neighbours; `Norm_Inf` bounds every entry; a rolling window keeps its
   sums within the bounds of its row count through every add and remove;
   `Factor` names a column exactly when it refuses; `Below` is under its
-  bound; `Qp.Polish.Run` passes only an answer `Certificate.Certified`
+  bound; a Sobol coordinate as a value lies in [0, 1), `Next` and `Skip`
+  advance the count by what they drew or refuse and leave it, a filled
+  block advances it by its size and a refused one leaves the sequence; `Qp.Polish.Run` passes only an answer `Certificate.Certified`
   holds for, and leaves the iterate as it was otherwise; and
   `Qp.Engine.Solve` returns `Certified` only when
   `Certificate.Certified` holds for the answer it returns.
@@ -152,7 +210,11 @@ Checked, not proved, by the AUnit suite and the features:
   answer, nor the polish to find the bounds an answer holds, only that
   an answer it calls certified is one.  The fixtures
   from `tools/make_qp.py` hold it to OSQP, Clarabel and HiGHS within
-  1e-6.
+  1e-6, and `tools/make_socp.py`'s to Clarabel, ECOS and the exact
+  solution of the optimality conditions;
+- that the Sobol points are the published ones and that a scrambled
+  block is stratified and as evenly spread as scipy's
+  (`tests/data/sobol.txt`, from `tools/make_sobol.py`).
 
 ## Using it
 

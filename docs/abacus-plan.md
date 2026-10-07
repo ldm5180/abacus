@@ -610,6 +610,12 @@ Nothing needed an assumption or a lemma; these needed a shape:
   (0, 3, 4) projects onto the cone at (2.5, 1.5, 2).  Fails to
   compile.
 - **Gates:** `make ci`, `make prove`.
+- **Done:** `Qp.Row_Kind` and `Problem.Kind`; `Abacus.Qp.Cones`; the
+  ADMM's cone projection; `Certificate.Cone_Residual`,
+  `Dual_Cone_Residual` and the cone's complementarity in `Certified`;
+  the infeasibility and unboundedness certificates over cones; the
+  polish declining a cone; `tools/make_socp.py` and the deviation
+  fixture; two qp.feature scenarios (see the as-built note).
 
 ### A14 -- Scrambled Sobol sequences
 
@@ -650,6 +656,10 @@ Nothing needed an assumption or a lemma; these needed a shape:
   them.  Fails to compile.
 - **Gates:** `make ci`, `make prove`: absence of run-time errors and
   the range postcondition.
+- **Done:** `Abacus.Sobol` (`Unscrambled`, `Scrambled`, `Next`, `Skip`,
+  `Next_Block`, `Unit`) and its generated `Abacus.Sobol.Directions`;
+  `tools/make_sobol.py`, `tools/sobol/`; `tests/data/sobol.txt`;
+  sobol.feature (see the as-built note).
 
 ## 4. Features
 
@@ -889,3 +899,52 @@ Nothing needed an assumption or a lemma; these needed a shape:
   equality with scipy).  A user rule arrived with these items: no state
   in a package, everything injected; abacus already kept it, and
   `CLAUDE.md` now states it.
+
+- **A13 and A14, as built (2026-10-06):** each item one TDD cycle or
+  more, logged.  What changed from the items as written, and why:
+  - **A13, the iteration:** as planned, a cone's rows share rho_row and
+    the factored matrix is A10's.  An interval row's arithmetic is
+    unchanged (the row update was split into relax, project, settle;
+    every QP test takes the iterations it took).
+  - **A13, the certificates:** the first certified-looking run of the
+    disc ended Unbounded at 10 iterations: the unboundedness check read
+    a cone's tail rows as half-open intervals, so a direction out of the
+    cone receded.  The duals' change is projected onto each cone's polar
+    and a direction must stay in its cones, as the item said; it was
+    needed at once, not as a refinement.
+  - **A13, the measurement:** the deviation program, certified from cold
+    with the default settings: 610 iterations, 72 ms (-O3, best of
+    five); residuals 73 units primal, 3 cone, 50 dual, 15 dual cone, 945
+    gap; weights within 9.5e-11 of the exact answer, against Clarabel's
+    4.1e-6 and ECOS's 1.5e-7.  rho_row from 2**0 to 2**6 took 960 to 540
+    iterations, all certified; 2**3 stays the default.
+  - **A13, the workspace:** `Workspace (N, K)` holds the polish's K by K
+    matrix, 18 MB at K = 1,502, which a cone problem never uses; the
+    test support now takes every workspace from the heap.  Not changed
+    here (it is the polish's shape); statera allocates it once, or poses
+    the cone over the 14 by 14 factor of G'G, ||G w|| = ||L' w||: 16
+    rows, 620 iterations, 2.1 ms, within 6.2e-11 (measured, scratch).
+  - **A13, how statera poses it:** divide the whole table (decay
+    weighting already applied to its rows) by one positive constant --
+    the pooled standard deviation of its entries -- which leaves w where
+    it was and t scaled by the same constant; dividing column by column
+    would change the problem unless the variables change with it.  The
+    unscaled table, tens of thousands per entry, puts P w past the
+    values (131,072) at w = 20.  Then m, the columns' means, and G = (P
+    - 1 m') / sqrt (T) on the grid; x = (w, t); the box 0 .. 20 and t
+    open; the budget an interval row; a head row picking t, Row_Lo 0;
+    G's rows as its tail, Row_Lo 0; q = (-m, lambda).
+  - **A14:** as planned.  The scramble's leading place takes no draw
+    (its matrix row is fixed).  Past_End is reached only when every
+    point is drawn: 2**32 is a multiple of every block's size, so an
+    aligned block that starts before the end fits.  scipy's
+    fast_forward walks every index (it did not finish at 3e9), so the
+    far-index oracle is the xor of scipy's own direction numbers over
+    the Gray code.  The generated table carries Joe and Kuo's copyright
+    notice, which their licence requires in a redistribution: the one
+    comment in `src/` that names people, deliberately.
+  - **Dependency injection:** the library holds no state in a package;
+    sobol.feature's region keeps its machine's state in the scenario.
+    The seven older feature regions, the suite's registration and the
+    benchmark's sink still hold package-level variables: the test
+    harness's debt under the new rule, not changed here.
