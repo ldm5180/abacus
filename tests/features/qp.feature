@@ -8,7 +8,10 @@ Feature: Quadratic programs
   polish -- and that answer is kept when it is certified.  A problem that cannot be met is
   refused as infeasible, one whose objective falls without end as
   unbounded, and one whose matrix is not positive semidefinite as not
-  convex.
+  convex.  A run of rows may instead lie in a second-order cone,
+  ||u|| <= s, which makes the problem a second-order cone program: the
+  answer is then also held to how far its rows lie outside the cone and
+  its multipliers outside the cone's polar.
 
   Scenario: A budget is split between two equal parts
     Given a problem in 2 variables with the identity as its matrix
@@ -112,3 +115,17 @@ Feature: Quadratic programs
     Given the tail problem from the fixtures
     When it is solved without the polish
     Then the outcome is exhausted
+
+  Scenario: A linear objective over a disc puts the answer on its edge
+    Given a problem in 2 variables with no quadratic term
+    And the linear objective -1, -1
+    And the variables within a disc of radius 1
+    When it is solved
+    Then the answer is certified
+    And each variable is 0.707106781
+
+  Scenario: The deviation of 1,500 outcomes over 14 columns, held by a cone, agrees with the conic solvers
+    Given the deviation problem from the fixtures
+    When it is solved
+    Then the answer is certified
+    And the answer agrees with the oracle's within 0.000001

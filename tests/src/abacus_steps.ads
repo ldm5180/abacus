@@ -79,6 +79,7 @@ package Abacus_Steps is
       E_Give_Objective,
       E_Sum_Exactly,
       E_Sum_At_Most,
+      E_Within_Disc,
       E_Solve_Qp,
       E_Solve_Warm,
       E_Solve_Unpolished,
@@ -188,8 +189,9 @@ package Abacus_Steps is
 
    subtype Small_Vector is Abacus.Vector (1 .. Max_Variables);
 
-   --  The problem qp.feature poses -- its matrix, objective, box and its
-   --  one row over every variable, or the name of a fixture -- and the
+   --  The problem qp.feature poses -- its matrix, objective, box, its
+   --  one row over every variable and a disc they lie within, or the name
+   --  of a fixture -- and the
    --  last solve's outcome, answer and iterations, with the cold-start
    --  iterations beside a warm start's; for a fixture, the largest gap
    --  to the oracle's answer and how many variables are above zero.
@@ -203,6 +205,8 @@ package Abacus_Steps is
       Has_Row    : Boolean := False;
       Row_Lo     : Abacus.Val := 0;
       Row_Hi     : Abacus.Val := 0;
+      Has_Disc   : Boolean := False;
+      Radius     : Abacus.Val := 0;
       Result     : Abacus.Qp.Outcome := Abacus.Qp.Exhausted;
       X, Z, Y    : Small_Vector := [others => 0];
       Z_Row      : Abacus.Val := 0;
@@ -392,6 +396,8 @@ package Abacus_Steps is
                                              >= E_Sum_Exactly,
       Step ("the variables summing to at most {word}")
                                              >= E_Sum_At_Most,
+      Step ("the variables within a disc of radius {word}")
+                                             >= E_Within_Disc,
       Step ("it is solved")                  >= E_Solve_Qp,
       Step ("it is solved again from that answer with the linear objective {}")
                                              >= E_Solve_Warm,

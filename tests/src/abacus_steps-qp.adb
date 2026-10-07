@@ -4,10 +4,10 @@ with Ada.Strings.Maps;
 
 with Abacus;    use Abacus;
 with Abacus.Qp; use Abacus.Qp;
-with Abacus.Qp.Engine;
 with Abacus.Text;
 
 with Abacus_Qp_Fixtures;
+with Abacus_Qp_Problems;
 with Abacus_Steps.Flows;
 
 package body Abacus_Steps.Qp is
@@ -45,6 +45,7 @@ package body Abacus_Steps.Qp is
       A_Objective,
       A_Sum_Exactly,
       A_Sum_At_Most,
+      A_Within_Disc,
       A_Solve,
       A_Solve_Warm,
       A_Load,
@@ -64,7 +65,7 @@ package body Abacus_Steps.Qp is
       A_Refuse_Certified,
       A_Refuse_Unposed);
 
-   subtype Pose_Action is Action_Kind range A_Pose_Identity .. A_Sum_At_Most;
+   subtype Pose_Action is Action_Kind range A_Pose_Identity .. A_Within_Disc;
    subtype Check_Action is Action_Kind range A_Check_Outcome .. A_Check_Held;
    subtype Refuse_Action is
      Action_Kind range A_Refuse_Pose .. A_Refuse_Unposed;
@@ -102,9 +103,32 @@ package body Abacus_Steps.Qp is
       end loop;
    end Pose;
 
+   --  The general rows of the world's problem: its one row, if any, then
+   --  a disc's cone -- a head row and one row per variable.
+   function Rows_Of (G : Program) return Count
+   is ((if G.Has_Row then 1 else 0) + (if G.Has_Disc then G.N + 1 else 0));
+
+   --  The disc ||x|| <= Radius as a cone from row First: a head row of
+   --  zeros whose lower bound is -Radius, then the identity.
+   procedure Pose_Disc (Pr : in out Problem; First : Index; Radius : Val) is
+   begin
+      for R in First .. Pr.K loop
+         for J in 1 .. Pr.N loop
+            Pr.E (R, J) := (if R - First = J then One else 0);
+         end loop;
+         Pr.Row_Lo (R) := (if R = First then -Radius else 0);
+         Pr.Row_Hi (R) := No_Upper;
+         Pr.Kind (R) := (if R = First then Cone_Head else Cone_Tail);
+      end loop;
+   end Pose_Disc;
+
+   function Solved
+     (Pr : Problem; S : Settings; St : in out State) return Outcome
+   renames Abacus_Qp_Problems.Solved;
+
    --  The problem the world holds, as the library takes it.
    function Problem_Of (G : Program) return Problem is
-      Pr : Problem (G.N, (if G.Has_Row then 1 else 0));
+      Pr : Problem (G.N, Rows_Of (G));
    begin
       for I in 1 .. G.N loop
          for J in 1 .. G.N loop
@@ -117,12 +141,15 @@ package body Abacus_Steps.Qp is
       Pr.E := [others => [others => One]];
       Pr.Row_Lo := [others => G.Row_Lo];
       Pr.Row_Hi := [others => G.Row_Hi];
+      if G.Has_Disc then
+         Pose_Disc (Pr, (if G.Has_Row then 2 else 1), G.Radius);
+      end if;
       return Pr;
    end Problem_Of;
 
    --  The iterate the world holds: its last answer, or a cold start.
    function State_Of (G : Program; Warm : Boolean) return State is
-      St : State := Cold (G.N, (if G.Has_Row then 1 else 0));
+      St : State := Cold (G.N, Rows_Of (G));
    begin
       if Warm then
          St.X := G.X (1 .. G.N);
@@ -150,11 +177,9 @@ package body Abacus_Steps.Qp is
    --  Solve the world's problem, cold or from its last answer.
    procedure Solve (G : in out Program; Warm : Boolean) is
       Pr     : constant Problem := Problem_Of (G);
-      Work   : Workspace (Pr.N, Pr.K);
       St     : State := State_Of (G, Warm);
-      Result : Outcome;
+      Result : constant Outcome := Solved (Pr, Default_Settings, St);
    begin
-      Engine.Solve (Pr, Default_Settings, Work, St, Result);
       Keep (G, St, Result);
    end Solve;
 
@@ -174,7 +199,12 @@ package body Abacus_Steps.Qp is
    --  The fixtures tools/make_qp.py wrote.
    function Is_Fixture (Name : String) return Boolean
    is (Name
-       in "spread" | "tail" | "tail_bounded" | "infeasible" | "nonconvex");
+       in "spread"
+        | "tail"
+        | "tail_bounded"
+        | "infeasible"
+        | "nonconvex"
+        | "deviation");
 
    function Fixture_Name (G : Program) return String
    is (G.Fixture (1 .. G.Named));
@@ -203,11 +233,10 @@ package body Abacus_Steps.Qp is
    end Gap_To_Oracle;
 
    procedure Solve_Fixture (G : in out Program; S : Settings) is
-      Pr   : constant Problem := Abacus_Qp_Fixtures.Load (Fixture_Name (G));
-      Work : Workspace (Pr.N, Pr.K);
-      St   : State := Cold (Pr.N, Pr.K);
+      Pr : constant Problem := Abacus_Qp_Fixtures.Load (Fixture_Name (G));
+      St : State := Cold (Pr.N, Pr.K);
    begin
-      Engine.Solve (Pr, S, Work, St, G.Result);
+      G.Result := Solved (Pr, S, St);
       G.Iterations := St.Iterations;
       G.Worst := Gap_To_Oracle (Fixture_Name (G), St.X);
       G.Held := 0;
@@ -317,6 +346,9 @@ package body Abacus_Steps.Qp is
                  Has_Row => True,
                  Row_Lo  => No_Lower,
                  Row_Hi  => Decimal_Of (Ctx));
+
+         when A_Within_Disc   =>
+            G := (G with delta Has_Disc => True, Radius => Decimal_Of (Ctx));
       end case;
    end Pose_Part;
 
@@ -366,8 +398,7 @@ package body Abacus_Steps.Qp is
            "a problem has 1 to"
            & Max_Variables'Image
            & " variables, or is one of the fixtures: spread, tail,"
-           & " tail_bounded,"
-           & " infeasible, nonconvex",
+           & " tail_bounded, infeasible, nonconvex, deviation",
          when A_Refuse_Part        =>
            "a bound or a total is a decimal number, a variable one of the"
            & " problem's, and an objective one number per variable",
@@ -444,6 +475,7 @@ package body Abacus_Steps.Qp is
    Give_Objective   : constant Ev := (Kind => E_Give_Objective);
    Sum_Exactly      : constant Ev := (Kind => E_Sum_Exactly);
    Sum_At_Most      : constant Ev := (Kind => E_Sum_At_Most);
+   Within_Disc      : constant Ev := (Kind => E_Within_Disc);
    Solve_Qp         : constant Ev := (Kind => E_Solve_Qp);
    Solve_Warm_Ev    : constant Ev := (Kind => E_Solve_Warm);
    Solve_Unpolished : constant Ev := (Kind => E_Solve_Unpolished);
@@ -483,6 +515,8 @@ package body Abacus_Steps.Qp is
       Posed    + Sum_Exactly                           / A_Refuse_Part        >= Posed,
       Posed    + Sum_At_Most     (Total_Read)          / A_Sum_At_Most        >= Posed,
       Posed    + Sum_At_Most                           / A_Refuse_Part        >= Posed,
+      Posed    + Within_Disc     (Total_Read)          / A_Within_Disc        >= Posed,
+      Posed    + Within_Disc                           / A_Refuse_Part        >= Posed,
       Posed    + Solve_Qp                              / A_Solve              >= Settling,
       Settling + Qp_Settled      (Is_Certified)                               >= Answered,
       Settling + Qp_Settled                                                   >= Refused,
