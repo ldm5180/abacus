@@ -1,3 +1,5 @@
+with Interfaces;
+
 with Fabula.Args;
 with Fabula.Check;
 with Fabula.Frames;
@@ -7,6 +9,7 @@ with Abacus;
 with Abacus.Arith;
 with Abacus.Ieee;
 with Abacus.Qp;
+with Abacus.Sobol;
 with Abacus.Text;
 
 --  The step registry the feature runner dispatches on: one Step_Kind
@@ -93,7 +96,19 @@ package Abacus_Steps is
       E_Check_Fewer,
       E_Load_Fixture,
       E_Check_Oracle,
-      E_Check_Held);
+      E_Check_Held,
+      E_Sobol_Plain,
+      E_Sobol_Scrambled,
+      E_Draw_Points,
+      E_Draw_Block,
+      --  An event no pattern names: a block's draw posts it, and the next
+      --  row's guard reads whether it was filled.
+      E_Block_Settled,
+      E_Check_Runs,
+      E_Check_Stratified,
+      E_Check_Same_Seed,
+      E_Check_Other_Seed,
+      E_Check_Block_Refused);
 
    type Hook_Kind is (Fresh_World);
 
@@ -219,6 +234,38 @@ package Abacus_Steps is
       Held       : Natural := 0;
    end record;
 
+   --  The most points and dimensions sobol.feature draws.
+   Max_Sample_Points     : constant := 1_024;
+   Max_Sample_Dimensions : constant := 8;
+
+   subtype Sample_Count is Natural range 0 .. Max_Sample_Points;
+   subtype Sample_Dimension is Natural range 0 .. Max_Sample_Dimensions;
+
+   type Sample_Table is
+     array (1 .. Max_Sample_Points, 1 .. Max_Sample_Dimensions)
+     of Abacus.Sobol.Coordinate;
+
+   --  Where sobol.feature's machine stands: no sequence yet, one given,
+   --  a block's draw settling, points drawn, or a block refused.  The
+   --  scenario holds it, not a package.
+   type Sampling_Stage is
+     (No_Sequence, Given, Drawing, Sampled, Block_Refused);
+
+   --  The sequence sobol.feature names -- its dimensions, whether it is
+   --  scrambled and from what seed, and how many points have been drawn
+   --  from it -- the points the last draw gave, and how the last block
+   --  was drawn.  A step makes the sequence again from these.
+   type Sampling is record
+      Stage     : Sampling_Stage := No_Sequence;
+      D         : Sample_Dimension := 0;
+      Scrambled : Boolean := False;
+      Seed      : Interfaces.Unsigned_64 := 0;
+      Drawn     : Abacus.Sobol.Point_Count := 0;
+      Points    : Sample_Table := [others => [others => 0]];
+      Count     : Sample_Count := 0;
+      Result    : Abacus.Sobol.Block_Result := Abacus.Sobol.Filled;
+   end record;
+
    --  What one scenario holds.  fabula copies it per step, so it holds
    --  values only.
    type World is record
@@ -229,6 +276,7 @@ package Abacus_Steps is
       Stats : Table;
       Chol  : Factoring;
       Qp    : Program;
+      Sobol : Sampling;
    end record;
 
    --  One step as a machine sees it: the scenario, the step's arguments,
@@ -414,7 +462,23 @@ package Abacus_Steps is
       Step ("the answer agrees with the oracle's within {word}")
                                              >= E_Check_Oracle,
       Step ("at least {int} variables are above zero")
-                                             >= E_Check_Held];
+                                             >= E_Check_Held,
+      Step ("a Sobol sequence in {int} dimensions")
+                                             >= E_Sobol_Plain,
+      Step ("a Sobol sequence in {int} dimensions scrambled with the seed {int}")
+                                             >= E_Sobol_Scrambled,
+      Step ("{int} points are drawn")        >= E_Draw_Points,
+      Step ("a block of {int} points is drawn")
+                                             >= E_Draw_Block,
+      Step ("coordinate {int} runs {}")      >= E_Check_Runs,
+      Step ("every coordinate has one point in each of {int} equal intervals")
+                                             >= E_Check_Stratified,
+      Step ("the seed {int} gives the same {int} points again")
+                                             >= E_Check_Same_Seed,
+      Step ("the seed {int} gives a different point at every one of them")
+                                             >= E_Check_Other_Seed,
+      Step ("the block is refused as {word}")
+                                             >= E_Check_Block_Refused];
    --!format on
 
    Hook_Defs : constant Steps.Hook_Table := [Before >= Fresh_World];
