@@ -6,6 +6,8 @@ with AUnit.Assertions; use AUnit.Assertions;
 
 with Abacus;
 use type Abacus.Raw;
+with Abacus.Arith;
+with Abacus.Elementary;
 with Abacus.Sobol; use Abacus.Sobol;
 
 with Abacus_Sobol_Fixtures;
@@ -243,6 +245,73 @@ package body Abacus_Sobol_Tests is
       Assert (Unit (Coordinate'Last) = One - 2**8, "the last below one");
    end Test_Unit;
 
+   --  The product over a point's coordinates of 1 - x**2.
+   function Own_Term (B : Block; I : Positive) return Abacus.Val is
+      use Abacus.Arith;
+      P : Abacus.Val := Abacus.One;
+   begin
+      for K in B'Range (2) loop
+         P := Mul (P, Abacus.One - Mul (Unit (B (I, K)), Unit (B (I, K))));
+      end loop;
+      return P;
+   end Own_Term;
+
+   --  The product over two points' coordinates of 1 - the larger.
+   function Pair_Term (B : Block; I, J : Positive) return Abacus.Val is
+      use Abacus.Arith;
+      P : Abacus.Val := Abacus.One;
+   begin
+      for K in B'Range (2) loop
+         P :=
+           Mul (P, Abacus.One - Unit (Unsigned_32'Max (B (I, K), B (J, K))));
+      end loop;
+      return P;
+   end Pair_Term;
+
+   --  The L2-star discrepancy of B's points, by Warnock's formula: the
+   --  root of 3**-d - 2**(1-d) / n sum_i own_i + 1 / n**2 sum_ij pair_ij.
+   function L2_Star (B : Block) return Abacus.Val is
+      use Abacus, Abacus.Arith;
+      N          : constant Wide := Wide (B'Length (1));
+      D          : constant Natural := B'Length (2);
+      Own, Pairs : Wide := 0;
+   begin
+      for I in B'Range (1) loop
+         Own := Own + Wide (Own_Term (B, I));
+         for J in B'Range (1) loop
+            Pairs := Pairs + Wide (Pair_Term (B, I, J));
+         end loop;
+      end loop;
+      return
+        Abacus.Elementary.Sqrt
+          (Val
+             (Div_Round (One, 3**D)
+              - Div_Round (2 * Own, Powers_Of_Two (D) * N)
+              + Div_Round (Pairs, N * N)));
+   end L2_Star;
+
+   --  The scrambled block's L2-star discrepancy is scipy's for the same
+   --  points, within 1e-8; it is no larger than scipy's own scrambled
+   --  Sobol points reach over 64 seeds, and below pseudo-random points'.
+   procedure Test_Discrepancy (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      use Abacus_Sobol_Fixtures;
+      Within : constant := Abacus.One / 100_000_000;
+      Oracle : constant Discrepancies := Measured;
+      S      : Sequence := Abacus.Sobol.Scrambled (Scrambled_Dimensions, Seed);
+      B      : Block (1 .. Scrambled_Points, 1 .. Scrambled_Dimensions);
+      Result : Block_Result;
+      Ours   : Abacus.Val;
+   begin
+      Next_Block (S, 8, B, Result);
+      Ours := L2_Star (B);
+      Assert
+        (abs (Ours - Oracle.Ours) <= Within,
+         "scipy's" & Oracle.Ours'Image & ", ours" & Ours'Image);
+      Assert (Ours <= Oracle.Their_Largest, "within scipy's own");
+      Assert (Ours < Oracle.Uniform_Mean, "below pseudo-random points'");
+   end Test_Discrepancy;
+
    overriding
    procedure Register_Tests (T : in out Test) is
       use AUnit.Test_Cases.Registration;
@@ -261,6 +330,8 @@ package body Abacus_Sobol_Tests is
       Register_Routine (T, Test_Blocks'Access, "Blocks of 2**k, stratified");
       Register_Routine (T, Test_Block_Refused'Access, "A block refused");
       Register_Routine (T, Test_Unit'Access, "A coordinate as a value");
+      Register_Routine
+        (T, Test_Discrepancy'Access, "Discrepancy, against scipy's");
    end Register_Tests;
 
    overriding
