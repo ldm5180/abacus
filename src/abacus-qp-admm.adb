@@ -2,6 +2,7 @@ with Abacus.Arith;    use Abacus.Arith;
 with Abacus.Cholesky;
 with Abacus.Matrices; use Abacus.Matrices;
 with Abacus.Qp.Certificate;
+with Abacus.Qp.Cones;
 
 package body Abacus.Qp.Admm
   with SPARK_Mode
@@ -164,6 +165,27 @@ is
       end loop;
    end Right_Side;
 
+   --  Z relaxed toward Tilde: Z + Alpha (Tilde - Z).
+   procedure Relax (Tilde, Z, Alpha : Val; Hat : out Val; Ok : in out Boolean)
+   is
+      Step : Val := 0;
+   begin
+      Hat := 0;
+      Store (Wide (Tilde) - Wide (Z), Step, Ok);
+      Store (Wide (Z) + Product_Of (Alpha, Step), Hat, Ok);
+   end Relax;
+
+   --  The dual step to a projected New_Z from the relaxed Hat: Y grows by
+   --  2**Rho (Hat - New_Z).
+   procedure Settle
+     (Hat, New_Z : Val; Rho : Shift; Y : in out Val; Ok : in out Boolean)
+   is
+      Step : Val := 0;
+   begin
+      Store (Wide (Hat) - Wide (New_Z), Step, Ok);
+      Store (Wide (Y) + Scaled (Step, Rho), Y, Ok);
+   end Settle;
+
    --  What one row's step needs: its new value Tilde, its bounds, the
    --  relaxation and the row's step size.
    type Row_Step is record
@@ -174,18 +196,15 @@ is
       Rho   : Shift;
    end record;
 
-   --  One row's relaxed projection and dual update.
+   --  One row's relaxed projection onto its interval and dual update.
    procedure Update (R : Row_Step; Z, Y : in out Val; Ok : in out Boolean) is
-      Hat   : Val := 0;
-      Step  : Val := 0;
+      Hat   : Val;
       New_Z : Val;
    begin
-      Store (Wide (R.Tilde) - Wide (Z), Step, Ok);
-      Store (Wide (Z) + Product_Of (R.Alpha, Step), Hat, Ok);
+      Relax (R.Tilde, Z, R.Alpha, Hat, Ok);
       New_Z :=
         Clamp (Wide (Hat) + Scaled (Y, -R.Rho), R.Lo, Val'Max (R.Lo, R.Hi));
-      Store (Wide (Hat) - Wide (New_Z), Step, Ok);
-      Store (Wide (Y) + Scaled (Step, R.Rho), Y, Ok);
+      Settle (Hat, New_Z, R.Rho, Y, Ok);
       Z := New_Z;
    end Update;
 
@@ -213,7 +232,76 @@ is
       end loop;
    end Update_Box;
 
-   --  The general rows updated from E times the solve's Tilde.
+   --  The general rows' step in progress: each row's relaxed value, the
+   --  value it is projected to, and whether every value stayed in range.
+   type Row_Work (K : Count) is record
+      Hat   : Vector (1 .. K);
+      New_Z : Vector (1 .. K);
+      Ok    : Boolean;
+   end record;
+
+   --  Each general row's relaxed value, from E times the solve's Tilde.
+   procedure Relax_Rows
+     (Pr    : Problem;
+      S     : Settings;
+      Tilde : Vector;
+      St    : State;
+      W     : in out Row_Work)
+   with
+     Pre =>
+       Fits_State (Pr, St)
+       and then Tilde'First = 1
+       and then Tilde'Last = Pr.N
+       and then W.K = Pr.K
+   is
+      Ex : Val := 0;
+   begin
+      for R in 1 .. Pr.K loop
+         Store (Certificate.Row_Of (Pr, R, Tilde), Ex, W.Ok);
+         Relax (Ex, St.Z_Row (R), S.Alpha, W.Hat (R), W.Ok);
+      end loop;
+   end Relax_Rows;
+
+   --  Where each general row is projected from: Hat + y_row / rho_row,
+   --  clamped into an interval row's bounds, less the vertex in a cone.
+   procedure Shifted_Rows
+     (Pr : Problem; S : Settings; St : State; W : in out Row_Work)
+   with Pre => Fits_State (Pr, St) and then W.K = Pr.K
+   is
+      Sum : Wide;
+   begin
+      for R in 1 .. Pr.K loop
+         Sum := Wide (W.Hat (R)) + Scaled (St.Y_Row (R), -S.Row_Shift);
+         if Cones.In_Cone (Pr, R) then
+            Store (Sum - Wide (Pr.Row_Lo (R)), W.New_Z (R), W.Ok);
+         else
+            W.New_Z (R) :=
+              Clamp
+                (Sum, Pr.Row_Lo (R), Val'Max (Pr.Row_Lo (R), Pr.Row_Hi (R)));
+         end if;
+      end loop;
+   end Shifted_Rows;
+
+   --  Each cone's run projected onto the cone, and its vertex added back.
+   procedure Project_Cones (Pr : Problem; W : in out Row_Work)
+   with Pre => W.K = Pr.K
+   is
+   begin
+      for R in 1 .. Pr.K loop
+         if Cones.Starts_Cone (Pr, R) then
+            Cones.Project (W.New_Z, R, Cones.Cone_Last (Pr, R), W.Ok);
+         end if;
+      end loop;
+      for R in 1 .. Pr.K loop
+         if Cones.In_Cone (Pr, R) then
+            Store
+              (Wide (W.New_Z (R)) + Wide (Pr.Row_Lo (R)), W.New_Z (R), W.Ok);
+         end if;
+      end loop;
+   end Project_Cones;
+
+   --  The general rows updated from E times the solve's Tilde: relaxed,
+   --  projected onto an interval or a cone, and their duals stepped.
    procedure Update_Rows
      (Pr    : Problem;
       S     : Settings;
@@ -224,16 +312,17 @@ is
      Pre =>
        Fits_State (Pr, St) and then Tilde'First = 1 and then Tilde'Last = Pr.N
    is
-      Ex : Val := 0;
+      W : Row_Work (Pr.K) :=
+        (K => Pr.K, Hat | New_Z => [others => 0], Ok => Ok);
    begin
+      Relax_Rows (Pr, S, Tilde, St, W);
+      Shifted_Rows (Pr, S, St, W);
+      Project_Cones (Pr, W);
       for R in 1 .. Pr.K loop
-         Store (Certificate.Row_Of (Pr, R, Tilde), Ex, Ok);
-         Update
-           ((Ex, Pr.Row_Lo (R), Pr.Row_Hi (R), S.Alpha, S.Row_Shift),
-            St.Z_Row (R),
-            St.Y_Row (R),
-            Ok);
+         Settle (W.Hat (R), W.New_Z (R), S.Row_Shift, St.Y_Row (R), W.Ok);
       end loop;
+      St.Z_Row := W.New_Z;
+      Ok := W.Ok;
    end Update_Rows;
 
    procedure Iterate

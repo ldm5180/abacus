@@ -285,11 +285,64 @@ package body Abacus_Qp_Engine_Tests is
       Assert (Nonconvex_Run.Result = Not_Convex, Report (Nonconvex_Run));
    end Test_Fixture_Refusals;
 
+   --  A linear objective over a disc: minimize -x1 - x2 with ||x|| <= 1
+   --  puts the answer on the boundary at the root of a half each.
+   procedure Test_Disc (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Root_Half : constant := 777_472_127_994;
+      Pr        : constant Problem := Disc ([-One, -One], One);
+      St        : State := Cold (2, 3);
+   begin
+      Assert (Solved (Pr, Default_Settings, St) = Certified, "certified");
+      Near (St.X (1), Root_Half, "x1");
+      Near (St.X (2), Root_Half, "x2");
+   end Test_Disc;
+
+   --  A disc that the box keeps away from is refused as infeasible.
+   procedure Test_Disc_Infeasible (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Pr : constant Problem := Disc ([0, 0], One, Lo => 2 * One);
+      St : State := Cold (2, 3);
+   begin
+      Assert (Solved (Pr, Default_Settings, St) = Infeasible, "infeasible");
+   end Test_Disc_Infeasible;
+
+   --  |x2| <= x1: minimizing -x2 falls without end along (1, 1), which
+   --  lies in the cone; with x1 capped at 5 the answer is (5, 5).
+   procedure Test_Cone_Unbounded (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Pr : Problem :=
+        (N      => 2,
+         K      => 2,
+         P      => [[0, 0], [0, 0]],
+         Q      => [0, -One],
+         Lo     => [No_Lower, No_Lower],
+         Hi     => [No_Upper, No_Upper],
+         E      => [[One, 0], [0, One]],
+         Row_Lo => [0, 0],
+         Row_Hi => [No_Upper, No_Upper],
+         Kind   => [Cone_Head, Cone_Tail]);
+      St : State := Cold (2, 2);
+   begin
+      Assert (Solved (Pr, Default_Settings, St) = Unbounded, "unbounded");
+      Pr.Hi (1) := 5 * One;
+      St := Cold (2, 2);
+      Assert (Solved (Pr, Default_Settings, St) = Certified, "capped");
+      Near (St.X (2), 5 * One, "x2");
+   end Test_Cone_Unbounded;
+
    overriding
    procedure Register_Tests (T : in out Test) is
       use AUnit.Test_Cases.Registration;
    begin
       Register_Routine (T, Test_Split'Access, "A budget split in two");
+      Register_Routine (T, Test_Disc'Access, "A linear objective on a disc");
+      Register_Routine
+        (T, Test_Disc_Infeasible'Access, "A disc the box keeps away from");
+      Register_Routine
+        (T, Test_Cone_Unbounded'Access, "A direction inside a cone");
       Register_Routine (T, Test_Cap_Binds'Access, "A cap that binds");
       Register_Routine (T, Test_At_Most'Access, "An at-most budget");
       Register_Routine (T, Test_Linear'Access, "A linear program");

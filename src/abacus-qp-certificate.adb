@@ -29,10 +29,18 @@ is
       return M;
    end Primal_Residual;
 
-   --  The cones' rows of E x less their vertex into V, zero elsewhere; Ok
-   --  is False when one is not a value.
+   --  Where a cone's rows are measured from: zero, for a direction, or
+   --  the vertex, for a point.
+   type Origin is (From_Zero, From_Vertex);
+
+   --  The cones' rows of E x, less their vertex when From_Vertex, into V,
+   --  zero elsewhere; Ok is False when one is not a value.
    procedure Cone_Rows
-     (Pr : Problem; X : Vector; V : out Vector; Ok : out Boolean)
+     (Pr   : Problem;
+      X    : Vector;
+      From : Origin;
+      V    : out Vector;
+      Ok   : out Boolean)
    with
      Pre =>
        X'First = 1
@@ -45,7 +53,11 @@ is
       Ok := True;
       for R in 1 .. Pr.K loop
          if In_Cone (Pr, R) then
-            Store (Row_Of (Pr, R, X) - Wide (Pr.Row_Lo (R)), V (R), Ok);
+            Store
+              (Row_Of (Pr, R, X)
+               - (if From = From_Vertex then Wide (Pr.Row_Lo (R)) else 0),
+               V (R),
+               Ok);
          end if;
       end loop;
    end Cone_Rows;
@@ -76,7 +88,7 @@ is
       V  : Vector (1 .. Pr.K);
       Ok : Boolean;
    begin
-      Cone_Rows (Pr, St.X, V, Ok);
+      Cone_Rows (Pr, St.X, From_Vertex, V, Ok);
       return (if Ok then Worst_Cone (Pr, V, Polar => False) else Beyond);
    end Cone_Residual;
 
@@ -136,7 +148,7 @@ is
       M    : Wide := 0;
       Last : Index;
    begin
-      Cone_Rows (Pr, St.X, V, Ok);
+      Cone_Rows (Pr, St.X, From_Vertex, V, Ok);
       if not Ok then
          return Beyond;
       end if;
@@ -203,9 +215,15 @@ is
       end loop;
    end Delta_Of;
 
-   --  D projected onto the polar of the recession cone of [Lo, Hi], as
-   --  OSQP does: a dual may not rise toward an open upper bound nor fall
-   --  toward an open lower one, so that part of its change is dropped.
+   --  A change D projected onto the polar of the recession cone of [Lo,
+   --  Hi], as OSQP does: a dual may not rise toward an open upper bound
+   --  nor fall toward an open lower one, so that part of it is dropped.
+   function Polar_Of (D, Lo, Hi : Val) return Val
+   is (if (Hi = No_Upper and then D > 0) or else (Lo = No_Lower and then D < 0)
+       then 0
+       else D);
+
+   --  The box's change projected entry by entry.
    procedure Project (D : in out Vector; Lo, Hi : Vector)
    with
      Pre =>
@@ -216,14 +234,26 @@ is
    is
    begin
       for I in D'Range loop
-         if Hi (I) = No_Upper then
-            D (I) := Val'Min (D (I), 0);
-         end if;
-         if Lo (I) = No_Lower then
-            D (I) := Val'Max (D (I), 0);
-         end if;
+         D (I) := Polar_Of (D (I), Lo (I), Hi (I));
       end loop;
    end Project;
+
+   --  The rows' change projected: an interval row's as the box's, and a
+   --  cone's run onto the cone's polar, -K, the polar of its recession
+   --  cone.  Ok is False when a norm is not a value.
+   procedure Project_Rows (Pr : Problem; D : in out Vector; Ok : out Boolean)
+   with Pre => D'First = 1 and then D'Last = Pr.K
+   is
+   begin
+      Ok := True;
+      for R in 1 .. Pr.K loop
+         if Starts_Cone (Pr, R) then
+            Project_Polar (D, R, Cone_Last (Pr, R), Ok);
+         elsif not In_Cone (Pr, R) then
+            D (R) := Polar_Of (D (R), Pr.Row_Lo (R), Pr.Row_Hi (R));
+         end if;
+      end loop;
+   end Project_Rows;
 
    --  The bounds' support of a change D in a row bounded by Lo and Hi:
    --  Hi D where D rises, Lo D where it falls.  Open is True when the
@@ -245,7 +275,8 @@ is
    with Post => Support_Of'Result.Value in -Support_Bound .. Support_Bound;
 
    --  The support of the duals' change over the box and the rows, and
-   --  whether any of it is open.
+   --  whether any of it is open.  A cone's change, projected onto its
+   --  polar, has the vertex's support over the shifted cone.
    function Total_Support (Pr : Problem; Dy, Dy_Row : Vector) return Support
    with
      Pre =>
@@ -266,7 +297,10 @@ is
               in -(Wide (I) * Support_Bound) .. Wide (I) * Support_Bound);
       end loop;
       for R in 1 .. Pr.K loop
-         Term := Support_Of (Dy_Row (R), Pr.Row_Lo (R), Pr.Row_Hi (R));
+         Term :=
+           (if In_Cone (Pr, R)
+            then (Product_Of (Pr.Row_Lo (R), Dy_Row (R)), False)
+            else Support_Of (Dy_Row (R), Pr.Row_Lo (R), Pr.Row_Hi (R)));
          Total := (Total.Value + Term.Value, Total.Open or else Term.Open);
          pragma
            Loop_Invariant
@@ -302,21 +336,24 @@ is
    function Infeasible
      (Pr : Problem; St, Last : State; Ratio : Natural) return Boolean
    is
-      Dy     : Vector (1 .. Pr.N);
-      Dy_Row : Vector (1 .. Pr.K);
-      Ok_Box : Boolean;
-      Ok_Row : Boolean;
-      Norm   : Wide;
-      Total  : Support;
+      Dy      : Vector (1 .. Pr.N);
+      Dy_Row  : Vector (1 .. Pr.K);
+      Ok_Box  : Boolean;
+      Ok_Row  : Boolean;
+      Ok_Cone : Boolean;
+      Norm    : Wide;
+      Total   : Support;
    begin
       Delta_Of (St.Y, Last.Y, Dy, Ok_Box);
       Delta_Of (St.Y_Row, Last.Y_Row, Dy_Row, Ok_Row);
       Project (Dy, Pr.Lo, Pr.Hi);
-      Project (Dy_Row, Pr.Row_Lo, Pr.Row_Hi);
+      Project_Rows (Pr, Dy_Row, Ok_Cone);
       Norm :=
         Larger
           (Wide (Vectors.Norm_Inf (Dy)), Wide (Vectors.Norm_Inf (Dy_Row)));
-      if not (Ok_Box and then Ok_Row) or else Norm < Least_Change then
+      if not (Ok_Box and then Ok_Row and then Ok_Cone)
+        or else Norm < Least_Change
+      then
          return False;
       end if;
       Total := Total_Support (Pr, Dy, Dy_Row);
@@ -341,6 +378,23 @@ is
    is ((Hi = No_Upper or else A <= Limit)
        and then (Lo = No_Lower or else A >= -Limit));
 
+   --  Whether every cone's rows of E dx lie in the cone, its recession
+   --  cone, within Limit.
+   function Cones_Recede
+     (Pr : Problem; Dx : Vector; Limit : Limit_Value) return Boolean
+   with Pre => Dx'First = 1 and then Dx'Last = Pr.N
+   is
+      V  : Vector (1 .. Pr.K);
+      Ok : Boolean;
+   begin
+      Cone_Rows (Pr, Dx, From_Zero, V, Ok);
+      return
+        Ok
+        and then (for all R in 1 .. Pr.K =>
+                    (if Starts_Cone (Pr, R)
+                     then Excess (V, R, Cone_Last (Pr, R)) <= Limit));
+   end Cones_Recede;
+
    --  Whether P dx, and every bounded row of dx, are within Limit.
    function Within_Cone
      (Pr : Problem; Dx : Vector; Limit : Limit_Value) return Boolean
@@ -356,13 +410,17 @@ is
          end if;
       end loop;
       for R in 1 .. Pr.K loop
-         if not Recedes
-                  (Row_Of (Pr, R, Dx), Pr.Row_Lo (R), Pr.Row_Hi (R), Limit)
+         if not In_Cone (Pr, R)
+           and then not Recedes
+                          (Row_Of (Pr, R, Dx),
+                           Pr.Row_Lo (R),
+                           Pr.Row_Hi (R),
+                           Limit)
          then
             return False;
          end if;
       end loop;
-      return True;
+      return Cones_Recede (Pr, Dx, Limit);
    end Within_Cone;
 
    function Unbounded

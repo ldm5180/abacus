@@ -143,6 +143,21 @@ package body Abacus_Qp_Certificate_Tests is
       Assert (Primal_Residual (Pr, St) = 0, "a cone row is not an interval");
    end Test_Cone;
 
+   --  A direction recedes in a cone only when its rows lie in the cone:
+   --  (1, 1) leaves the disc, whose head row does not move, but stays in
+   --  |x2| <= x1.
+   procedure Test_Cone_Recedes (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Round : Problem := Disc ([-One, -One], One);
+      Last  : constant State := Cold (2, 3);
+      St    : State := Cold (2, 3);
+   begin
+      St.X := [One, One];
+      Assert (not Unbounded (Round, St, Last, 16), "out of the disc");
+      Round.E (1, 1) := 2 * One;
+      Assert (Unbounded (Round, St, Last, 16), "inside ||x|| <= 2 x1");
+   end Test_Cone_Recedes;
+
    overriding
    procedure Register_Tests (T : in out Test) is
       use AUnit.Test_Cases.Registration;
@@ -152,6 +167,8 @@ package body Abacus_Qp_Certificate_Tests is
       Register_Routine (T, Test_Infeasible'Access, "Infeasibility");
       Register_Routine (T, Test_Unbounded'Access, "Unboundedness");
       Register_Routine (T, Test_Cone'Access, "A cone's residuals");
+      Register_Routine
+        (T, Test_Cone_Recedes'Access, "A direction receding in a cone");
    end Register_Tests;
 
    overriding
