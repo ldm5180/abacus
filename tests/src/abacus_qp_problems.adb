@@ -1,3 +1,5 @@
+with Ada.Unchecked_Deallocation;
+
 with Abacus.Arith;
 with Abacus.Elementary;
 with Abacus.Qp.Engine;
@@ -144,13 +146,21 @@ package body Abacus_Qp_Problems is
       Pose_Shortfalls (Pr, Columns);
    end Pose_Tail;
 
+   type Workspace_Access is access Workspace;
+
+   procedure Free is new
+     Ada.Unchecked_Deallocation (Workspace, Workspace_Access);
+
+   --  The workspace is taken from the heap: a problem of K rows needs a
+   --  K by K matrix for the polish, 18 MB at 1,502 rows.
    function Solved
      (Pr : Problem; S : Settings; St : in out State) return Outcome
    is
-      Work   : Workspace (Pr.N, Pr.K);
+      Work   : Workspace_Access := new Workspace (Pr.N, Pr.K);
       Result : Outcome;
    begin
-      Abacus.Qp.Engine.Solve (Pr, S, Work, St, Result);
+      Abacus.Qp.Engine.Solve (Pr, S, Work.all, St, Result);
+      Free (Work);
       return Result;
    end Solved;
 

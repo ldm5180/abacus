@@ -240,6 +240,18 @@ package body Abacus_Qp_Engine_Tests is
       Assert (R.Result = Certified and then R.Worst <= Millionth, Report (R));
    end Test_Tail_Bounded;
 
+   --  The deviation program at the size it is used at: 14 columns over
+   --  1,500 outcomes, maximize the mean less 75 times the deviation, the
+   --  weights in 0 .. 20 summing to 10.  A cone of 1,501 rows; certified
+   --  from cold, within a millionth of the exact answer the conic solvers
+   --  agree with.
+   procedure Test_Deviation (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      R : constant Fixture_Run := Run_Fixture ("deviation", Default_Settings);
+   begin
+      Assert (R.Result = Certified and then R.Worst <= Millionth, Report (R));
+   end Test_Deviation;
+
    type Problem_Access is access Problem;
    type Workspace_Access is access Workspace;
 
@@ -342,6 +354,8 @@ package body Abacus_Qp_Engine_Tests is
         (T, Test_Disc_Infeasible'Access, "A disc the box keeps away from");
       Register_Routine
         (T, Test_Cone_Unbounded'Access, "A direction inside a cone");
+      Register_Routine
+        (T, Test_Deviation'Access, "The deviation program at its size");
       Register_Routine (T, Test_Cap_Binds'Access, "A cap that binds");
       Register_Routine (T, Test_At_Most'Access, "An at-most budget");
       Register_Routine (T, Test_Linear'Access, "A linear program");

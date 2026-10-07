@@ -1,3 +1,4 @@
+with Ada.Strings.Fixed;
 with Ada.Text_IO; use Ada.Text_IO;
 
 package body Abacus_Qp_Fixtures is
@@ -23,17 +24,35 @@ package body Abacus_Qp_Fixtures is
       end loop;
    end Get_Matrix;
 
-   --  The sizes on the file's second line, the file left after them.
-   procedure Open_Sized (F : in out File_Type; Name : String; N, K : out Raw)
+   --  What a file's first two lines say: the sizes, and whether it holds
+   --  the rows' kinds.
+   type Header is record
+      N, K  : Raw;
+      Kinds : Boolean;
+   end record;
+
+   --  The file opened and its header read, the file left after it.
+   procedure Open_Sized (F : in out File_Type; Name : String; H : out Header)
    is
    begin
       Open (F, In_File, Path (Name));
-      Skip_Line (F);
-      Raw_IO.Get (F, N);
-      Raw_IO.Get (F, K);
+      H.Kinds := Ada.Strings.Fixed.Index (Get_Line (F), "kinds") > 0;
+      Raw_IO.Get (F, H.N);
+      Raw_IO.Get (F, H.K);
    end Open_Sized;
 
-   procedure Get_Problem (F : File_Type; Pr : out Problem) is
+   --  The rows' kinds, written 0 (an interval), 1 (a cone's head) or 2
+   --  (a cone's tail).
+   procedure Get_Kinds (F : File_Type; Kind : out Row_Kinds) is
+      Code : Raw;
+   begin
+      for R in Kind'Range loop
+         Raw_IO.Get (F, Code);
+         Kind (R) := Row_Kind'Val (Code);
+      end loop;
+   end Get_Kinds;
+
+   procedure Get_Problem (F : File_Type; Kinds : Boolean; Pr : out Problem) is
    begin
       Get_Matrix (F, Pr.P);
       Get_Vector (F, Pr.Q);
@@ -42,15 +61,19 @@ package body Abacus_Qp_Fixtures is
       Get_Matrix (F, Pr.E);
       Get_Vector (F, Pr.Row_Lo);
       Get_Vector (F, Pr.Row_Hi);
+      Pr.Kind := [others => Interval];
+      if Kinds then
+         Get_Kinds (F, Pr.Kind);
+      end if;
    end Get_Problem;
 
    function Load (Name : String) return Problem is
-      F    : File_Type;
-      N, K : Raw;
+      F : File_Type;
+      H : Header;
    begin
-      Open_Sized (F, Name, N, K);
-      return Pr : Problem (Index (N), Abacus.Count (K)) do
-         Get_Problem (F, Pr);
+      Open_Sized (F, Name, H);
+      return Pr : Problem (Index (H.N), Abacus.Count (H.K)) do
+         Get_Problem (F, H.Kinds, Pr);
          Close (F);
       end return;
    end Load;
@@ -76,15 +99,15 @@ package body Abacus_Qp_Fixtures is
    end Has_Answer;
 
    function Answer (Name : String) return Vector is
-      F    : File_Type;
-      N, K : Raw;
+      F : File_Type;
+      H : Header;
    begin
-      Open_Sized (F, Name, N, K);
+      Open_Sized (F, Name, H);
       declare
-         Pr : Problem (Index (N), Abacus.Count (K));
-         X  : Vector (1 .. Index (N));
+         Pr : Problem (Index (H.N), Abacus.Count (H.K));
+         X  : Vector (1 .. Index (H.N));
       begin
-         Get_Problem (F, Pr);
+         Get_Problem (F, H.Kinds, Pr);
          Get_Vector (F, X);
          Close (F);
          return X;
