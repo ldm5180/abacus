@@ -165,6 +165,10 @@ make bench      # the benchmark, at -O3
 make ci         # every gate
 ```
 
+What abacus does is stated as Gherkin features in
+[tests/features](tests/features), and published as living documentation
+at <https://ldm5180.github.io/abacus/> from every push to main.
+
 The library depends on sml alone (the scanner and the solver's loop
 are sml machines); AUnit and fabula are for the tests.
 
