@@ -3,10 +3,11 @@
 **Status (2026-10-06):** S0 done on branch `spike` (`spike/`):
 **go**, with scaled 64-bit integers at `Frac = 40` (section 2).  A1-A12
 built on `main`, every unit proved at level 2 with no assumption, the
-seven features green in both modes.  One open risk for statera: plain
-ADMM does not certify the tail-mean (CVaR-shaped) linear program (A10's
-note).  Three iterations of the plan, S0's note, then the
-implementation's (see Revision notes).
+seven features green in both modes.  Two follow-ups since: the sort is
+a merge sort over up to 2**30 elements, and the solver polishes, which
+certifies the tail-mean (CVaR-shaped) linear program that plain ADMM
+could not (A10's note, now closed).  Three iterations of the plan, S0's
+note, the implementation's, then the follow-ups' (see Revision notes).
 
 abacus is fixed-point numerics for Ada 2022, proved in SPARK:
 arithmetic on scaled integers, text and IEEE conversion, elementary
@@ -682,8 +683,9 @@ Nothing needed an assumption or a lemma; these needed a shape:
     binding beside an exact one (certified, within 1e-6 of OSQP and
     Clarabel); a linear program; infeasible and non-convex problems,
     small and at 120; a warm start that takes fewer iterations.
-  - **A10, the open risk:** the tail-mean linear program (the CVaR
-    shape: 131 variables, 101 rows, open bounds) is not certified.
+  - **A10, the open risk (closed by the follow-ups' polish):** the
+    tail-mean linear program (the CVaR shape: 131 variables, 101 rows,
+    open bounds) is not certified.
     ADMM creeps at residuals near 1e-6 under every step size swept
     (rho 2**-6 .. 2**2, rho_row 2**-2 .. 2**6, sigma 2**-20 .. 2**-6,
     alpha 1 .. 1.75); OSQP does not finish it in 400,000 iterations
@@ -724,3 +726,45 @@ Nothing needed an assumption or a lemma; these needed a shape:
     still checked.  An aggregate that names its target, or an iterated
     one, is built on the stack by GNAT; the order starts from
     `[others => Place'First]` and a loop.
+  - **The tail program, the user's three steps in order** (each
+    measured; the first that certified is kept):
+    1. *Bound it as the caller will* (`tail_bounded`, from
+       `tools/make_qp.py`): with w >= 0 summing to the budget B, the
+       threshold a lies in [min_s (-B max_j r_sj), max_s (-B min_j
+       r_sj)] and each shortfall u_s in [0, -B min_j r_sj - that least
+       a].  HiGHS's answer is the open program's within 8.5e-16; the box
+       never binds.  ADMM: Exhausted at 40,000, primal 1.5e-6, dual
+       3.4e-6, gap 2.8e-7 (the open program: 1.6e-6, 3.8e-6, 2.8e-7); a
+       step-size sweep's best, rho_row 1, 5.2e-7.  OSQP: 400,000.
+    2. *Ruiz equilibration and adaptive rho*, measured on a float64
+       prototype of this solver (scratch, not kept) that reproduced the
+       Ada solver's residuals to three figures.  Ruiz is the identity
+       here: every row and column of the KKT data already has infinity
+       norm one (the budget row's ones, the threshold's column, the
+       shortfalls' identity), and so has q.  Adaptive rho_row (OSQP's
+       rule, powers of two, refactored on a change of four or more):
+       1.1e-6 / 1.4e-6 at 40,000; adapting both rhos, 5.2e-7 / 7.4e-7 at
+       best.  Not certified, and OSQP, which has both, is not either; so
+       it was not built in Ada.
+    3. *Polish* (`Abacus.Qp.Polish`, built): the held bounds read off the
+       iterate by OSQP's rule; the free variables solved with the held
+       rows as equalities through A'A + delta P + delta**2 I (delta =
+       2**-12: the scaled form keeps every entry a value; dividing by
+       delta for the multipliers amplifies rounding by 2**12, so they
+       are recovered by least squares through A A' instead), refined
+       against the exact system; up to four corrections, one constraint
+       at a time (releasing every wrong-signed multiplier at once
+       overshoots).  Both systems are factored in a leading block
+       (`Cholesky.Factor_Leading`), packed over the free variables and
+       held rows: a whole-size factorization per attempt made the
+       3,000-variable QP 70% slower.  Certifies `tail` and `tail_bounded`
+       at 2,100 iterations (90 ms), within 5e-9 of HiGHS; a 180 x 250
+       instance (431 variables, 251 rows) at 900 iterations (0.30 s),
+       within 7.5e-9, where plain ADMM ends Exhausted at 40,000 after
+       11.4 s.  The QPs ADMM certified take the iterations they took.
+    - **What statera does:** box the threshold and the shortfalls as in
+      step 1 (it costs nothing and keeps the polish's systems in range,
+      though the open program certifies too); keep the default
+      `Polish_Every` and `Polish_Below`; size `Workspace (N, K)` with
+      the rows' count.  The threshold is a level of loss, -r'w, so its
+      box is the range of the scenarios' losses, not of their returns.

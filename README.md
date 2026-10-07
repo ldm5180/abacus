@@ -47,10 +47,11 @@ per-element rescale ADMM needs is eleven times slower.
 | `Abacus.Stats` | means, weighted mean, variance, covariance, correlation, skewness, kurtosis, z-scores and Z Z' |
 | `Abacus.Stats.Rolling` | a window of exact sums that slides |
 | `Abacus.Matrices` | the dot kernels, products, Gram matrices |
-| `Abacus.Cholesky` | factor (refusing by column), the two triangular solves, least squares |
+| `Abacus.Cholesky` | factor (refusing by column), the two triangular solves, either over a leading block alone, least squares |
 | `Abacus.Qp` | the problem, its settings, tolerances, state and outcomes |
 | `Abacus.Qp.Admm` | the iteration and the checks between iterations |
 | `Abacus.Qp.Certificate` | the residuals, `Certified`, and the infeasibility certificates |
+| `Abacus.Qp.Polish` | the held bounds read off an iterate, the problem solved with them held, one correction at a time |
 | `Abacus.Qp.Engine` | the solver's loop, an sml machine, and `Solve` |
 | `Abacus.Random` | SplitMix64 with an explicit state, and `Below` without bias |
 
@@ -80,8 +81,9 @@ Minimize (1/2) x'P x + q'x subject to lo <= x <= hi and row_lo <= E x
 operator-splitting form, as OSQP: P + sigma I + rho I + rho_row E'E is
 factored once and each iteration solves with it, projects, and updates
 the duals; every step size is a power of two.  The caller holds the
-factor's `Workspace`, so a large problem's need not live on the stack,
-and passes the iterate in and out, so a warm start is the last answer.
+`Workspace` (N, K) -- the factor, and the polish's matrices -- so a
+large problem's need not live on the stack, and passes the iterate in
+and out, so a warm start is the last answer.
 
 A certified answer is held to `Qp.Certificate.Certified`: its primal
 residual (how far x and E x lie outside their bounds), its dual
@@ -94,17 +96,33 @@ refused by OSQP's two certificates, read from the change between
 checks; a P that is not positive semidefinite by a refused
 factorization of P + sigma I.
 
-What it does not do well: a linear program that ADMM converges on
-slowly.  The tail-mean program in `tests/data/qp_tail.txt` (131 variables,
-101 rows) creeps at residuals near 1e-6 and is not certified in 40,000
-iterations -- OSQP does not finish it in 400,000 -- so it ends
-`Exhausted`, never `Certified`.  There is no polish step.
+**The polish.**  ADMM settles which bounds a linear program's answer
+holds long before its residuals meet these tolerances, and then creeps:
+the tail-mean program in `tests/data/qp_tail.txt` (131 variables, 101
+rows) sits near 1e-6 after 40,000 iterations under every step size, and
+OSQP does not finish it in 400,000.  So every `Polish_Every` (100)
+iterations, once both residuals are within `Polish_Below` (1e-3), the
+solver reads the held bounds off the iterate (OSQP's rule), fixes the
+held variables and solves for the free ones with the held rows as
+equalities: A'A + delta P + delta**2 I, delta = 2**-12, over the free
+variables and refined against the exact system, then the rows'
+multipliers by least squares through A A' -- both by the Cholesky
+factorization of a leading block, so an attempt costs the size of the
+free set, not of the problem.  An answer that is not certified is
+corrected one constraint at a time, a wrong-signed multiplier released
+or a violated bound held, up to four times.  An answer is kept only when
+its certificate holds; otherwise the iteration goes on from where it
+was.  The tail program is certified at 2,100 iterations (90 ms), within
+5e-9 of HiGHS; at 180 columns over 250 scenarios (431 variables, 251
+rows) at 900 iterations (0.30 s), within 7.5e-9.  `Polish_Every => 0`
+turns it off, and the tail program then ends `Exhausted`, never
+`Certified`.
 
 ## What is proved and what is checked
 
 `make prove` runs gnatprove at level 2 with `--checks-as-errors=on` over
-every unit in `src/`: no `pragma Assume`, no `SPARK_Mode Off`; 1,411
-checks, all proved, in 75 s from a clean object directory (gnatprove 15,
+every unit in `src/`: no `pragma Assume`, no `SPARK_Mode Off`; 1,804
+checks, all proved, in 2 min 43 s from a clean object directory (gnatprove 15,
 `-j0`).  Proved:
 
 - absence of run-time errors everywhere: no overflow, no range or index
@@ -118,7 +136,9 @@ checks, all proved, in 75 s from a clean object directory (gnatprove 15,
   neighbours; `Norm_Inf` bounds every entry; a rolling window keeps its
   sums within the bounds of its row count through every add and remove;
   `Factor` names a column exactly when it refuses; `Below` is under its
-  bound; and `Qp.Engine.Solve` returns `Certified` only when
+  bound; `Qp.Polish.Run` passes only an answer `Certificate.Certified`
+  holds for, and leaves the iterate as it was otherwise; and
+  `Qp.Engine.Solve` returns `Certified` only when
   `Certificate.Certified` holds for the answer it returns.
 
 Checked, not proved, by the AUnit suite and the features:
@@ -129,7 +149,8 @@ Checked, not proved, by the AUnit suite and the features:
   of scipy's `ndtri` (`tests/data/elementary.txt`, from
   `tools/make_elementary.py`);
 - that the solver converges: the algorithm is not proved to reach an
-  answer, only that an answer it calls certified is one.  The fixtures
+  answer, nor the polish to find the bounds an answer holds, only that
+  an answer it calls certified is one.  The fixtures
   from `tools/make_qp.py` hold it to OSQP, Clarabel and HiGHS within
   1e-6.
 
@@ -154,15 +175,15 @@ contracts off), the second of two runs (`bench/results/release.csv`):
 
 | | 180 | 3,000 |
 |---|---|---|
-| dot product | 0.18 us | 2.3 us |
-| rank update Z Z', 250 observations | 2.0 ms | 0.53 s |
-| Cholesky factor | 0.61 ms | 3.6 s |
-| the two triangular solves | 0.02 ms | 7.8 ms |
-| QP in correlation space, certified | 3.2 ms (60 iterations) | 9.1 s (200 iterations) |
+| dot product | 0.19 us | 2.4 us |
+| rank update Z Z', 250 observations | 1.9 ms | 0.53 s |
+| Cholesky factor | 0.63 ms | 3.3 s |
+| the two triangular solves | 0.02 ms | 7.7 ms |
+| QP in correlation space, certified | 3.4 ms (60 iterations) | 8.7 s (200 iterations) |
 
 | | 1,000,000 | 4,000,000 |
 |---|---|---|
-| sort order, values among 4,096, keys among 2**20, scratch from the heap | 0.17 s | 0.90 s |
+| sort order, values among 4,096, keys among 2**20, scratch from the heap | 0.17 s | 0.89 s |
 
 The QP at 3,000 pays two factorizations, one of them the convexity
 check.  Timings on one box move by up to 30% between runs at the small

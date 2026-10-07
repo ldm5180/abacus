@@ -1,15 +1,15 @@
 profile,what,size,ms,note
-release,dot x 100000, 180, 17.605,
-release,rank update Z Z' over 250 days, 180, 1.988,ESTIMATED
-release,factor, 180, 0.609,FACTORED
-release,solve, 180, 0.019,SOLVED
-release,qp, 180, 3.243,CERTIFIED 60 iterations
+release,dot x 100000, 180, 19.132,
+release,rank update Z Z' over 250 days, 180, 1.877,ESTIMATED
+release,factor, 180, 0.629,FACTORED
+release,solve, 180, 0.020,SOLVED
+release,qp, 180, 3.360,CERTIFIED 60 iterations
 # sink 498173614121912
-release,dot x 100000, 3000, 234.595,
-release,rank update Z Z' over 250 days, 3000, 529.705,ESTIMATED
-release,factor, 3000, 3609.140,FACTORED
-release,solve, 3000, 7.753,SOLVED
-release,qp, 3000, 9054.291,CERTIFIED 200 iterations
+release,dot x 100000, 3000, 240.129,
+release,rank update Z Z' over 250 days, 3000, 525.636,ESTIMATED
+release,factor, 3000, 3251.979,FACTORED
+release,solve, 3000, 7.714,SOLVED
+release,qp, 3000, 8685.049,CERTIFIED 200 iterations
 # sink-9059361353498685
-release,sort order, 1000000, 165.294,seeded
-release,sort order, 4000000, 897.658,seeded
+release,sort order, 1000000, 169.321,seeded
+release,sort order, 4000000, 885.806,seeded
