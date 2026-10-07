@@ -51,4 +51,31 @@ is
      (V : in out Vector; Head, Last : Index; Ok : in out Boolean)
    with Pre => Is_Run (V, Head, Last);
 
+   ---------------------------------------------------------------------
+   --  A problem's cones, as runs of its general rows.
+   ---------------------------------------------------------------------
+
+   --  Whether general row R lies in a cone.
+   function In_Cone (Pr : Problem; R : Index) return Boolean
+   is (R <= Pr.K and then Pr.Kind (R) /= Interval);
+
+   --  Whether general row R begins a cone: a head, or a tail with no cone
+   --  above it.
+   function Starts_Cone (Pr : Problem; R : Index) return Boolean
+   is (In_Cone (Pr, R)
+       and then (Pr.Kind (R) = Cone_Head
+                 or else R = 1
+                 or else Pr.Kind (R - 1) = Interval));
+
+   --  The last row of the cone that begins at Head: the last of the tail
+   --  rows right after it.
+   function Cone_Last (Pr : Problem; Head : Index) return Index
+   with
+     Pre  => Starts_Cone (Pr, Head),
+     Post => Cone_Last'Result in Head .. Pr.K;
+
+   --  Whether any general row lies in a cone.
+   function Has_Cone (Pr : Problem) return Boolean
+   is (for some R in 1 .. Pr.K => Pr.Kind (R) /= Interval);
+
 end Abacus.Qp.Cones;

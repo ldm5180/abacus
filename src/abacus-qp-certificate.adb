@@ -1,5 +1,6 @@
 with Abacus.Arith;    use Abacus.Arith;
 with Abacus.Matrices; use Abacus.Matrices;
+with Abacus.Qp.Cones; use Abacus.Qp.Cones;
 with Abacus.Vectors;
 
 package body Abacus.Qp.Certificate
@@ -17,13 +18,70 @@ is
          pragma Loop_Invariant (M in 0 .. 2 * Grid_Bound);
       end loop;
       for R in 1 .. Pr.K loop
-         M :=
-           Larger
-             (M, Outside (Row_Of (Pr, R, St.X), Pr.Row_Lo (R), Pr.Row_Hi (R)));
+         if not In_Cone (Pr, R) then
+            M :=
+              Larger
+                (M,
+                 Outside (Row_Of (Pr, R, St.X), Pr.Row_Lo (R), Pr.Row_Hi (R)));
+         end if;
          pragma Loop_Invariant (M in 0 .. 2 * Grid_Bound);
       end loop;
       return M;
    end Primal_Residual;
+
+   --  The cones' rows of E x less their vertex into V, zero elsewhere; Ok
+   --  is False when one is not a value.
+   procedure Cone_Rows
+     (Pr : Problem; X : Vector; V : out Vector; Ok : out Boolean)
+   with
+     Pre =>
+       X'First = 1
+       and then X'Last = Pr.N
+       and then V'First = 1
+       and then V'Last = Pr.K
+   is
+   begin
+      V := [others => 0];
+      Ok := True;
+      for R in 1 .. Pr.K loop
+         if In_Cone (Pr, R) then
+            Store (Row_Of (Pr, R, X) - Wide (Pr.Row_Lo (R)), V (R), Ok);
+         end if;
+      end loop;
+   end Cone_Rows;
+
+   --  The largest Excess or Polar_Excess of V over the problem's cones.
+   function Worst_Cone (Pr : Problem; V : Vector; Polar : Boolean) return Wide
+   with
+     Pre  => V'First = 1 and then V'Last = Pr.K,
+     Post => Worst_Cone'Result in 0 .. Beyond
+   is
+      M : Wide := 0;
+   begin
+      for R in 1 .. Pr.K loop
+         if Starts_Cone (Pr, R) then
+            M :=
+              Larger
+                (M,
+                 (if Polar
+                  then Polar_Excess (V, R, Cone_Last (Pr, R))
+                  else Excess (V, R, Cone_Last (Pr, R))));
+         end if;
+         pragma Loop_Invariant (M in 0 .. Beyond);
+      end loop;
+      return M;
+   end Worst_Cone;
+
+   function Cone_Residual (Pr : Problem; St : State) return Wide is
+      V  : Vector (1 .. Pr.K);
+      Ok : Boolean;
+   begin
+      Cone_Rows (Pr, St.X, V, Ok);
+      return (if Ok then Worst_Cone (Pr, V, Polar => False) else Beyond);
+   end Cone_Residual;
+
+   function Dual_Cone_Residual (Pr : Problem; St : State) return Wide
+   is (Worst_Cone (Pr, St.Y_Row, Polar => True));
 
    --  Entry I of P x + Q + y + E'y_row.
    function Gradient (Pr : Problem; St : State; I : Index) return Wide
@@ -68,6 +126,36 @@ is
        else 0)
    with Post => Slack_Term'Result >= 0;
 
+   --  The largest magnitude of a cone's multipliers' inner product with
+   --  its rows of E x less the vertex; Beyond when a row is not a value.
+   function Cone_Gap (Pr : Problem; St : State) return Wide
+   with Pre => Fits_State (Pr, St), Post => Cone_Gap'Result >= 0
+   is
+      V    : Vector (1 .. Pr.K);
+      Ok   : Boolean;
+      M    : Wide := 0;
+      Last : Index;
+   begin
+      Cone_Rows (Pr, St.X, V, Ok);
+      if not Ok then
+         return Beyond;
+      end if;
+      for R in 1 .. Pr.K loop
+         if Starts_Cone (Pr, R) then
+            Last := Cone_Last (Pr, R);
+            M :=
+              Larger
+                (M,
+                 Magnitude
+                   (Round_Shift
+                      (Vectors.Dot_Exact
+                         (St.Y_Row (R .. Last), V (R .. Last)))));
+         end if;
+         pragma Loop_Invariant (M >= 0);
+      end loop;
+      return M;
+   end Cone_Gap;
+
    function Complementarity (Pr : Problem; St : State) return Wide is
       M : Wide := 0;
    begin
@@ -78,17 +166,19 @@ is
          pragma Loop_Invariant (M >= 0);
       end loop;
       for R in 1 .. Pr.K loop
-         M :=
-           Larger
-             (M,
-              Slack_Term
-                (St.Y_Row (R),
-                 Row_Of (Pr, R, St.X),
-                 Pr.Row_Lo (R),
-                 Pr.Row_Hi (R)));
+         if not In_Cone (Pr, R) then
+            M :=
+              Larger
+                (M,
+                 Slack_Term
+                   (St.Y_Row (R),
+                    Row_Of (Pr, R, St.X),
+                    Pr.Row_Lo (R),
+                    Pr.Row_Hi (R)));
+         end if;
          pragma Loop_Invariant (M >= 0);
       end loop;
-      return M;
+      return Larger (M, Cone_Gap (Pr, St));
    end Complementarity;
 
    ---------------------------------------------------------------------

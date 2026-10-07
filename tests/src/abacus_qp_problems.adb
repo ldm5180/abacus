@@ -16,7 +16,22 @@ package body Abacus_Qp_Problems is
         Hi     => [Hi, Hi],
         E      => [[One, One]],
         Row_Lo => [Row_Lo],
-        Row_Hi => [Row_Hi]));
+        Row_Hi => [Row_Hi],
+        Kind   => [Interval]));
+
+   function Disc
+     (Q : Vector; Radius : Val; Lo : Val := No_Lower; Hi : Val := No_Upper)
+      return Problem
+   is ((N      => 2,
+        K      => 3,
+        P      => [[0, 0], [0, 0]],
+        Q      => Q,
+        Lo     => [Lo, Lo],
+        Hi     => [Hi, Hi],
+        E      => [[0, 0], [One, 0], [0, One]],
+        Row_Lo => [-Radius, 0, 0],
+        Row_Hi => [No_Upper, No_Upper, No_Upper],
+        Kind   => [Cone_Head, Cone_Tail, Cone_Tail]));
 
    function With_P (Pr : Problem; P : Matrix) return Problem is
       Result : Problem := Pr;

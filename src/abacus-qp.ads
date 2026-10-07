@@ -2,9 +2,10 @@
 --  (1/2) x'P x + Q'x subject to Lo <= x <= Hi and Row_Lo <= E x <= Row_Hi,
 --  with P symmetric positive semidefinite.  The box rows are the
 --  identity, so only the K general rows are stored.  A bound at the end
---  of the values is no bound: Val'First below, Val'Last above.  The
---  solver is Abacus.Qp.Engine; the certificate it is held to is
---  Abacus.Qp.Certificate.
+--  of the values is no bound: Val'First below, Val'Last above.  A run of
+--  general rows may instead lie in a second-order cone, which makes the
+--  problem a second-order cone program.  The solver is Abacus.Qp.Engine;
+--  the certificate it is held to is Abacus.Qp.Certificate.
 
 with Abacus.Cholesky;
 
@@ -14,6 +15,16 @@ is
 
    No_Lower : constant Val := Val'First;
    No_Upper : constant Val := Val'Last;
+
+   --  What a general row is held to.  Interval: Row_Lo .. Row_Hi.
+   --  Cone_Head: it begins a second-order cone, which the Cone_Tail rows
+   --  right after it continue; a Cone_Tail with no cone above it begins
+   --  one.  The cone's rows of E x, less their Row_Lo (the cone's
+   --  vertex), lie in {(s, u) : ||u|| <= s}, s the head's; Row_Hi is not
+   --  read.  So ||G x + g|| <= h'x + h0 is a head row h' with Row_Lo
+   --  -h0 and the rows of G with Row_Lo -g.
+   type Row_Kind is (Interval, Cone_Head, Cone_Tail);
+   type Row_Kinds is array (Index range <>) of Row_Kind;
 
    type Problem
      (N : Index;
@@ -26,6 +37,7 @@ is
       E      : Matrix (1 .. K, 1 .. N);
       Row_Lo : Vector (1 .. K);
       Row_Hi : Vector (1 .. K);
+      Kind   : Row_Kinds (1 .. K) := [others => Interval];
    end record;
 
    subtype Nonnegative is Val range 0 .. Val'Last;

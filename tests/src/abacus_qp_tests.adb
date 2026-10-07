@@ -18,7 +18,8 @@ package body Abacus_Qp_Tests is
          Hi     => [others => One],
          E      => [others => [others => One]],
          Row_Lo => [One],
-         Row_Hi => [One]);
+         Row_Hi => [One],
+         Kind   => <>);
    begin
       Assert (St.X = [0, 0, 0] and then St.Y_Row = [0], "zeros");
       Assert (St.Iterations = 0, "no iterations");

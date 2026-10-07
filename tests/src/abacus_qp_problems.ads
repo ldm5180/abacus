@@ -15,6 +15,14 @@ package Abacus_Qp_Problems is
      (Q : Vector := [0, 0]; Lo, Hi : Val := 0; Row_Lo, Row_Hi : Val := One)
       return Problem;
 
+   --  Minimize Q'x over x in Lo .. Hi with ||x|| <= Radius: two
+   --  variables, no quadratic term, and one cone of three rows -- a head
+   --  row of zeros with lower bound -Radius, so its row of E x less that
+   --  bound is Radius, and the identity below it.
+   function Disc
+     (Q : Vector; Radius : Val; Lo : Val := No_Lower; Hi : Val := No_Upper)
+      return Problem;
+
    --  Two with P given in place of the identity.
    function With_P (Pr : Problem; P : Matrix) return Problem
    with Pre => P'Length (1) = Pr.N and then P'Length (2) = Pr.N;

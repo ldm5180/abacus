@@ -1,6 +1,8 @@
 --  The certificates a solve is held to, computed at 128 bits and rounded
 --  once per entry.  Certified: the answer's primal residual, dual
---  residual and complementarity are each within their tolerance.
+--  residual and complementarity are each within their tolerance, and so
+--  are how far its rows lie outside their cones and its multipliers
+--  outside the cones' polars.
 --  Infeasible: a change in the duals that no x can answer.  Unbounded:
 --  a change in x along which the objective falls and every bound holds.
 
@@ -34,8 +36,8 @@ is
    is (if W < 0 then -W else W)
    with Pre => W > Wide'First;
 
-   --  How far x lies outside its box and E x outside its rows' bounds,
-   --  at most.
+   --  How far x lies outside its box and E x outside its interval rows'
+   --  bounds, at most.
    function Primal_Residual (Pr : Problem; St : State) return Wide
    with Pre => Fits_State (Pr, St), Post => Primal_Residual'Result >= 0;
 
@@ -43,16 +45,30 @@ is
    function Dual_Residual (Pr : Problem; St : State) return Wide
    with Pre => Fits_State (Pr, St), Post => Dual_Residual'Result >= 0;
 
+   --  How far E x less the vertex lies outside each cone, at most (the
+   --  cone's excess, ||u|| - s): the cones' primal residual.
+   function Cone_Residual (Pr : Problem; St : State) return Wide
+   with Pre => Fits_State (Pr, St), Post => Cone_Residual'Result >= 0;
+
+   --  How far each cone's multipliers lie outside its polar, at most: a
+   --  cone's multipliers belong to -K, the cone being its own dual.
+   function Dual_Cone_Residual (Pr : Problem; St : State) return Wide
+   with Pre => Fits_State (Pr, St), Post => Dual_Cone_Residual'Result >= 0;
+
    --  The largest multiplier times the slack of the bound it holds: a
    --  positive y belongs to an upper bound, a negative one to a lower.
    --  Against an open bound a multiplier must be zero, and counts whole.
+   --  A cone's is the magnitude of its multipliers' inner product with
+   --  its rows of E x less the vertex.
    function Complementarity (Pr : Problem; St : State) return Wide
    with Pre => Fits_State (Pr, St), Post => Complementarity'Result >= 0;
 
    function Certified
      (Pr : Problem; St : State; Tol : Tolerance) return Boolean
    is (Primal_Residual (Pr, St) <= Wide (Tol.Primal)
+       and then Cone_Residual (Pr, St) <= Wide (Tol.Primal)
        and then Dual_Residual (Pr, St) <= Wide (Tol.Dual)
+       and then Dual_Cone_Residual (Pr, St) <= Wide (Tol.Dual)
        and then Complementarity (Pr, St) <= Wide (Tol.Gap))
    with Pre => Fits_State (Pr, St);
 

@@ -89,4 +89,15 @@ is
       Negate (V, Head, Last);
    end Project_Polar;
 
+   function Cone_Last (Pr : Problem; Head : Index) return Index is
+      Last : Index := Head;
+   begin
+      while Last < Pr.K and then Pr.Kind (Last + 1) = Cone_Tail loop
+         pragma Loop_Invariant (Last in Head .. Pr.K - 1);
+         pragma Loop_Variant (Increases => Last);
+         Last := Last + 1;
+      end loop;
+      return Last;
+   end Cone_Last;
+
 end Abacus.Qp.Cones;
