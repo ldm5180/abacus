@@ -8,6 +8,9 @@ a merge sort over up to 2**30 elements, and the solver polishes, which
 certifies the tail-mean (CVaR-shaped) linear program that plain ADMM
 could not (A10's note, now closed).  Three iterations of the plan, S0's
 note, the implementation's, then the follow-ups' (see Revision notes).
+A13 (second-order cones in the solver) and A14 (scrambled Sobol
+sequences) were added for statera's first consumer; see their items and
+their revision note.
 
 abacus is fixed-point numerics for Ada 2022, proved in SPARK:
 arithmetic on scaled integers, text and IEEE conversion, elementary
@@ -104,6 +107,8 @@ generic for that (`Abacus.Quantities`).
 | `Abacus.Cholesky` | factor, solve, least squares |
 | `Abacus.Qp` | the QP problem, the solver, the certificate |
 | `Abacus.Random` | a seeded integer generator |
+| `Abacus.Qp.Cones` | the second-order cone: norm, projection, how far outside |
+| `Abacus.Sobol` | scrambled Sobol sequences |
 
 ### 1.3 What is proved
 
@@ -551,6 +556,101 @@ Nothing needed an assumption or a lemma; these needed a shape:
 - **Gates:** `make ci`.
 - **Done:** `bench/`, `make bench`, `bench/results/release.csv`, README.md.
 
+### A13 -- Second-order cone constraints in the solver
+
+- **Where:** `src/abacus-qp.ads` (the rows' kinds),
+  `src/abacus-qp-cones.ads/.adb` (new: the cone's geometry),
+  `-admm.adb`, `-certificate.ads/.adb`, `-polish.adb`;
+  `tools/make_socp.py` and `tests/data/qp_deviation*.txt`.
+- **What is wrong:** statera's first consumer (a portfolio-balancing
+  tool) seeds every solve with: maximize mean (P w) - lambda times the
+  standard deviation of P w, over a table P of T outcomes of n
+  columns, w boxed and summing to a budget.  The deviation is a norm,
+  ||(P - 1 m') w|| / sqrt (T), so the program is a second-order cone
+  program, not a QP, and `Abacus.Qp` cannot pose it.  Squaring it into
+  a variance changes the answer (the objective is not monotone in the
+  variance for a fixed mean), so it cannot be posed as a QP either.
+- **Why:** A10 built the box and the interval rows, which is all a QP
+  needs.
+- **Fix:** a general row is held either to an interval, as now, or to
+  a second-order cone: rows Head .. Last of E x, less their lower
+  bounds (the cone's vertex), lie in {(s, u) : ||u|| <= s}.  So
+  ||G x + g|| <= h'x + h0 is the head row h' with lower bound -h0 and
+  the rows of G with lower bounds -g.  A row's kind is a component of
+  `Problem` with a default of `Interval`, so every problem already
+  posed means what it meant.
+  - The iteration is A10's, unchanged but for the projection: a cone's
+    rows are projected together onto the cone, in closed form -- kept
+    when ||u|| <= s, zero when ||u|| <= -s, else scaled to the boundary
+    ((s + r) / 2, u (s + r) / (2 r)), r = ||u||.  The norm is the
+    proved integer root (`Elementary.Root`) of the sum of squares,
+    exact at 128 bits; a norm past the values is the iterate leaving
+    its range.  The cone's rows share rho_row with the interval rows,
+    so the factored matrix is A10's.
+  - The certificate grows two residuals: how far E x less the vertex
+    lies outside each cone (||u|| - s, at most), held to the primal
+    tolerance, and how far -y_row lies outside it (the dual cone: a
+    second-order cone is its own dual), held to the dual one; a cone's
+    complementarity is |<y_row, E x - vertex>| over its rows.  `Solve`'s
+    postcondition is unchanged in form and still proved.
+  - The infeasibility certificates generalize: the duals' change is
+    projected onto the polar of each cone (-K), whose support over the
+    shifted cone is its vertex times the change; a direction recedes in
+    a cone when its rows lie in the cone.
+  - The polish does not handle cones: an equality-constrained solve
+    cannot hold a curved constraint, so a problem with a cone is not
+    polished.
+  - Oracle: `tools/make_socp.py`, seeded, at the real shape (T = 1,500,
+    n = 14, 0 <= w <= 20, sum w = 10, lambda = 75), the epigraph form
+    minimize -m'w + lambda t with ||(P - 1 m') w|| / sqrt (T) <= t.
+    Clarabel and ECOS at tight tolerance, and an exact solve of the
+    optimality conditions on their active set (Newton, to the last
+    place) as the answer, the way S0 polished OSQP's.
+- **RED first:** `Abacus_Qp_Cones_Tests.Test_Projects_To_Boundary`:
+  (0, 3, 4) projects onto the cone at (2.5, 1.5, 2).  Fails to
+  compile.
+- **Gates:** `make ci`, `make prove`.
+
+### A14 -- Scrambled Sobol sequences
+
+- **Where:** `src/abacus-sobol.ads/.adb`, its generated table
+  `src/abacus-sobol-directions.ads` from `tools/make_sobol.py`, the
+  published direction numbers' first 64 dimensions and their licence
+  under `tools/sobol/`.
+- **What is wrong:** the same consumer refines its answer by sampling
+  around it with a scrambled Sobol sequence (scipy's `qmc.Sobol`, seeded
+  per cycle, drawing a power-of-two block), and abacus has only a
+  pseudo-random generator.
+- **Why:** nothing needed low-discrepancy points before.
+- **Fix:** `Abacus.Sobol`: points in [0, 1)**d, d up to 64, each
+  coordinate an integer over 2**32 (and as a value on the grid, a shift
+  by 8).  The method is scipy's; the stream is not bit-for-bit
+  scipy's, which the user chose.
+  - Joe and Kuo's direction numbers (`new-joe-kuo-6.21201`, criterion
+    D(6)) for the first 64 dimensions, committed as data with their
+    licence; nothing is fetched at build time.  The 32 direction numbers
+    of a dimension are made from its primitive polynomial and initial
+    numbers by the usual recurrence.
+  - Gray-code order (Antonov and Saleev): each point is the last with
+    one direction number xored in, the one indexed by the lowest zero
+    bit of the count.  `Skip` jumps to any index by the Gray code of the
+    index.
+  - Scrambling as scipy's: a linear matrix scramble (each dimension's
+    direction numbers multiplied by a random unit lower-triangular
+    binary matrix, so each digit is its own xor some of the digits
+    above it) and a digital shift (a random xor), both drawn from
+    `Abacus.Random` seeded by the caller.  Both map each elementary
+    interval onto one, so a scrambled block keeps the net property.
+  - `Next_Block (M)` draws the next 2**M points, refusing by name a
+    block that does not start at a multiple of 2**M (whose points would
+    not be stratified) or that runs past the 2**32 points there are.
+- **RED first:** `Abacus_Sobol_Tests.Test_First_Points`: the first
+  eight unscrambled points in three dimensions are 0, 1/2, 3/4, 1/4,
+  3/8, 7/8, 5/8, 1/8 (first coordinate) as the published program prints
+  them.  Fails to compile.
+- **Gates:** `make ci`, `make prove`: absence of run-time errors and
+  the range postcondition.
+
 ## 4. Features
 
 | file | says |
@@ -561,7 +661,8 @@ Nothing needed an assumption or a lemma; these needed a shape:
 | `elementary.feature` | each function against its definition, at the grid's resolution |
 | `stats.feature` | means and covariances on tables small enough to check by hand; order does not matter; a slid window equals a fresh one |
 | `cholesky.feature` | factor and solve; a singular matrix is refused and the column named |
-| `qp.feature` | small problems with known answers; infeasible, unbounded and non-convex problems each refused by name; a certified answer meets its tolerances |
+| `qp.feature` | small problems with known answers; infeasible, unbounded and non-convex problems each refused by name; a certified answer meets its tolerances; a cone holds a linear objective's answer on its boundary, and the deviation program agrees with two conic solvers |
+| `sobol.feature` | the first points as published; a block of 2**k points puts one in each of 2**k equal intervals of every coordinate; a seed gives one stream, two seeds two |
 
 ## Revision notes
 
@@ -768,3 +869,23 @@ Nothing needed an assumption or a lemma; these needed a shape:
       `Polish_Every` and `Polish_Below`; size `Workspace (N, K)` with
       the rows' count.  The threshold is a level of loss, -r'w, so its
       box is the range of the scenarios' losses, not of their returns.
+
+- **A13 and A14 (2026-10-06), as items:** written for statera's
+  reproduction of a portfolio-balancing tool, whose seed solve is a
+  second-order cone program and whose refinement samples a scrambled
+  Sobol sequence.  Decisions made writing them: a cone is a run of
+  general rows with a kind, not a new discriminant, so every problem,
+  state and workspace keeps its shape and every caller compiles
+  unchanged; a cone's lower bounds are its vertex, so the offset of
+  ||G x + g|| <= h'x + h0 needs no new component; the cone rows share
+  rho_row (a float prototype of this iteration, at the real shape,
+  certified 1e-10 / 1e-9 in about 600 iterations with rho_row 2**3,
+  and 2**0 and 2**6 were no better); the oracle's answer is an exact
+  solve of the optimality conditions, because Clarabel and ECOS agree
+  with each other only to about 1e-6 in the weights on this program
+  (its objective is flat along the budget), while the prototype ADMM
+  agrees with the exact solve to 1e-10.  The Sobol stream is scipy's
+  method with abacus's own seed stream (the user chose that over bit
+  equality with scipy).  A user rule arrived with these items: no state
+  in a package, everything injected; abacus already kept it, and
+  `CLAUDE.md` now states it.

@@ -78,6 +78,14 @@ comment.
 - Narrowing goes through one checked store (`Abacus.Arith.Store`) that
   clears an `Ok` and leaves the target as it was.
 
+## Dependency injection
+
+- No package-level variable, set-once cell or singleton.  Everything a
+  subprogram needs arrives as a parameter, a generic formal, or a field
+  of an object it was handed: a generator's state, a solver's iterate
+  and workspace, a sequence's scramble are objects the caller holds and
+  passes.  Constants are fine.
+
 ## TDD protocol (strict)
 
 - Red/green/refactor, every cycle: failing test first (RED = compile
