@@ -11,6 +11,7 @@ with Abacus_Qp_Polish_Tests;
 with Abacus_Qp_Tests;
 with Abacus_Quantities_Tests;
 with Abacus_Random_Tests;
+with Abacus_Sobol_Tests;
 with Abacus_Sorting_Tests;
 with Abacus_Stats_Rolling_Tests;
 with Abacus_Stats_Tests;
@@ -42,6 +43,7 @@ package body Abacus_Suite is
    Engine : aliased Abacus_Qp_Engine_Tests.Test;
    Polish : aliased Abacus_Qp_Polish_Tests.Test;
    Rand   : aliased Abacus_Random_Tests.Test;
+   Sobol  : aliased Abacus_Sobol_Tests.Test;
 
    function Suite return Access_Test_Suite is
    begin
@@ -64,6 +66,7 @@ package body Abacus_Suite is
       Add_Test (Result'Access, Engine'Access);
       Add_Test (Result'Access, Polish'Access);
       Add_Test (Result'Access, Rand'Access);
+      Add_Test (Result'Access, Sobol'Access);
       return Result'Access;
    end Suite;
 

@@ -12,6 +12,7 @@ with Abacus.Qp.Engine;
 with Abacus.Qp.Polish;
 with Abacus.Quantities;
 with Abacus.Random;
+with Abacus.Sobol;
 with Abacus.Sorting;
 with Abacus.Stats;
 with Abacus.Stats.Rolling;
