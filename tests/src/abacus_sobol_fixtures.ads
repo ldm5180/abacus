@@ -36,4 +36,17 @@ package Abacus_Sobol_Fixtures is
 
    function Measured return Discrepancies;
 
+   --  Unscrambled points at eight far indices in 64 dimensions, up to the
+   --  last of the 2**32.
+   Far_Points : constant := 8;
+
+   type Far_Point is record
+      Index : Point_Count;
+      X     : Point (1 .. Plain_Dimensions);
+   end record;
+
+   type Far_Table is array (1 .. Far_Points) of Far_Point;
+
+   function Far return Far_Table;
+
 end Abacus_Sobol_Fixtures;

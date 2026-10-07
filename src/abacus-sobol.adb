@@ -58,6 +58,35 @@ is
       return C;
    end Changed_Digit;
 
+   --  The point at index N: the xor of the direction numbers the Gray
+   --  code of N names, digit K for bit K - 1.
+   function Point_At (S : Sequence; N : Point_Count) return Point
+   with Post => Point_At'Result'First = 1 and then Point_At'Result'Last = S.D
+   is
+      Gray : constant Unsigned_64 := N xor Shift_Right (N, 1);
+      X    : Point (1 .. S.D) := [others => 0];
+   begin
+      for K in Digit loop
+         if (Shift_Right (Gray, K - 1) and 1) = 1 then
+            for J in 1 .. S.D loop
+               X (J) := X (J) xor S.V (J) (K);
+            end loop;
+         end if;
+      end loop;
+      return X;
+   end Point_At;
+
+   procedure Skip (S : in out Sequence; Count : Point_Count; Ok : out Boolean)
+   is
+   begin
+      Ok := Count <= Period - S.Count;
+      if Ok then
+         S.Count := S.Count + Count;
+         S.Current :=
+           (if S.Count < Period then Point_At (S, S.Count) else S.Current);
+      end if;
+   end Skip;
+
    procedure Next (S : in out Sequence; X : out Point; Ok : out Boolean) is
    begin
       X := [others => 0];

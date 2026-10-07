@@ -58,6 +58,54 @@ package body Abacus_Sobol_Tests is
       end loop;
    end Test_Against_Scipy;
 
+   --  Skipping to a far index gives the point there: every digit of every
+   --  dimension's direction numbers is read on the way to the last.
+   procedure Test_Skip_Far (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      use Abacus_Sobol_Fixtures;
+      X  : Point (1 .. Plain_Dimensions);
+      Ok : Boolean;
+   begin
+      for P of Far loop
+         declare
+            S : Sequence := Unscrambled (Plain_Dimensions);
+         begin
+            Skip (S, P.Index, Ok);
+            Assert (Ok and then Drawn (S) = P.Index, "skipped");
+            Next (S, X, Ok);
+            Assert (Ok and then X = P.X, "the point at" & P.Index'Image);
+         end;
+      end loop;
+   end Test_Skip_Far;
+
+   --  A skip in steps lands where one skip does, and where drawing does;
+   --  a skip past the last point is refused and leaves the sequence; at
+   --  the end, Next refuses.
+   procedure Test_Skip (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Drawn_S, Skipped, Stepped : Sequence := Unscrambled (5);
+      X, Y, Z                   : Point (1 .. 5);
+      Ok                        : Boolean;
+   begin
+      for I in 1 .. 37 loop
+         Next (Drawn_S, X, Ok);
+      end loop;
+      Skip (Skipped, 37, Ok);
+      Skip (Stepped, 30, Ok);
+      Skip (Stepped, 0, Ok);
+      Skip (Stepped, 7, Ok);
+      Next (Drawn_S, X, Ok);
+      Next (Skipped, Y, Ok);
+      Next (Stepped, Z, Ok);
+      Assert (X = Y and then Y = Z, "one point");
+      Skip (Skipped, Period, Ok);
+      Assert (not Ok and then Drawn (Skipped) = 38, "past the end, refused");
+      Skip (Skipped, Period - 38, Ok);
+      Assert (Ok and then Drawn (Skipped) = Period, "to the end");
+      Next (Skipped, Y, Ok);
+      Assert (not Ok and then Y = [0, 0, 0, 0, 0], "none left");
+   end Test_Skip;
+
    overriding
    procedure Register_Tests (T : in out Test) is
       use AUnit.Test_Cases.Registration;
@@ -68,6 +116,8 @@ package body Abacus_Sobol_Tests is
         (T,
          Test_Against_Scipy'Access,
          "64 points in 64 dimensions, as scipy's");
+      Register_Routine (T, Test_Skip_Far'Access, "Skipped to far indices");
+      Register_Routine (T, Test_Skip'Access, "Skipping");
    end Register_Tests;
 
    overriding

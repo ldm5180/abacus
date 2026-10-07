@@ -1,3 +1,5 @@
+with Interfaces;
+
 with Ada.Text_IO; use Ada.Text_IO;
 
 package body Abacus_Sobol_Fixtures is
@@ -56,5 +58,23 @@ package body Abacus_Sobol_Fixtures is
       Close (F);
       return Result;
    end Measured;
+
+   function Far return Far_Table is
+      package Count_IO is new Ada.Text_IO.Modular_IO (Interfaces.Unsigned_64);
+      F      : File_Type;
+      Result : Far_Table;
+      Index  : Interfaces.Unsigned_64;
+   begin
+      Open_After (F, Plain_Points + Scrambled_Points + 6);
+      for P of Result loop
+         Count_IO.Get (F, Index);
+         P.Index := Index;
+         for J in P.X'Range loop
+            Coordinate_IO.Get (F, P.X (J));
+         end loop;
+      end loop;
+      Close (F);
+      return Result;
+   end Far;
 
 end Abacus_Sobol_Fixtures;

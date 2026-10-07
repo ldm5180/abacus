@@ -22,7 +22,11 @@ Written:
   L2-star discrepancy of those 256 points; and, for comparison, the mean
   and the largest of the same discrepancy over scipy's own scrambled
   Sobol points for 64 seeds, and the mean over 64 seeds of uniform
-  pseudo-random points.  Discrepancies are raw at Frac 40.
+  pseudo-random points.  Discrepancies are raw at Frac 40.  Last, the
+  unscrambled points at eight far indices in 64 dimensions, up to the
+  last of the 2**32, which read every digit of the direction numbers:
+  the xor of scipy's own direction numbers over the Gray code of the
+  index (scipy's fast_forward walks every index before it).
 
 Python runs only to write these files.  Usage, from the repository root:
 
@@ -47,6 +51,8 @@ FRAC = 40
 SEED = 20261006
 SCRAMBLED_D, SCRAMBLED_N = 8, 256
 UNSCRAMBLED_D, UNSCRAMBLED_N = 64, 64
+FAR = [1000, 65535, 65536, 1000003, 2**31 - 1, 2**31, 3000000000,
+       2**32 - 1]
 COMPARISONS = 64
 
 
@@ -237,8 +243,20 @@ def write_fixture(table):
         f" {np.mean(theirs):.6e}, largest {max(theirs):.6e}; uniform mean"
         f" {np.mean(uniform):.6e}",
     ]
+    readable = lines[-1]
+    lines.append(f"the unscrambled points at {len(FAR)} far indices in"
+                 f" {UNSCRAMBLED_D} dimensions (scipy): the index, then the"
+                 " point")
+    sv = qmc.Sobol(UNSCRAMBLED_D, scramble=False, bits=BITS)._sv
+    for index in FAR:
+        gray = index ^ (index >> 1)
+        row = [0] * UNSCRAMBLED_D
+        for k in range(BITS):
+            if (gray >> k) & 1:
+                row = [x ^ int(sv[j][k]) for j, x in enumerate(row)]
+        lines.append(" ".join(map(str, [index, *row])))
     FIXTURE.write_text("\n".join(lines) + "\n")
-    return lines[-1]
+    return readable
 
 
 def main():

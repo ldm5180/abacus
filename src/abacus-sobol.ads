@@ -45,6 +45,15 @@ is
        Ok = (Drawn (S'Old) < Period)
        and then Drawn (S) = (if Ok then Drawn (S'Old) + 1 else Drawn (S'Old));
 
+   --  Count points passed over without being drawn, Ok; Ok is False, and
+   --  S left as it was, when fewer than Count remain.  The point reached
+   --  is made at once from the Gray code of its index.
+   procedure Skip (S : in out Sequence; Count : Point_Count; Ok : out Boolean)
+   with
+     Post =>
+       Ok = (Count <= Period - Drawn (S'Old))
+       and then (if Ok then Drawn (S) = Drawn (S'Old) + Count else S = S'Old);
+
 private
 
    subtype Digit is Positive range 1 .. Bits;
