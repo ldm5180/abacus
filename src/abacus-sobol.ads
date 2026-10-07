@@ -3,8 +3,11 @@ with Interfaces;
 --  Sobol sequences: points in [0, 1)**D, D up to 64, each coordinate an
 --  integer over 2**32.  The direction numbers are Joe and Kuo's
 --  (criterion D(6)), and the points come in Gray-code order, each the
---  last with one direction number xored in.  A sequence is an object the
---  caller holds: its direction numbers and the count drawn travel in it.
+--  last with one direction number xored in.  A scrambled sequence is
+--  scipy's method -- a linear matrix scramble and a digital shift -- with
+--  abacus's seeded generator, so it is not scipy's stream.  A sequence is
+--  an object the caller holds: its direction numbers, its shift and the
+--  count drawn travel in it.
 
 package Abacus.Sobol
   with SPARK_Mode, Pure
@@ -32,6 +35,15 @@ is
 
    --  The sequence in D dimensions as published, its first point zero.
    function Unscrambled (D : Dimension) return Sequence;
+
+   --  The sequence in D dimensions scrambled from Seed: each dimension's
+   --  direction numbers multiplied by a random unit lower-triangular
+   --  binary matrix (each digit becomes itself xor some of the digits
+   --  above it), and every point xored with a random shift, the first
+   --  point.  Both send each elementary interval onto one, so the
+   --  points stay as evenly spread; a seed gives one stream.
+   function Scrambled
+     (D : Dimension; Seed : Interfaces.Unsigned_64) return Sequence;
 
    --  How many points have been drawn from S.
    function Drawn (S : Sequence) return Point_Count;
@@ -63,10 +75,11 @@ private
    type Direction_Numbers is array (Digit) of Coordinate;
    type Direction_Table is array (Dimension range <>) of Direction_Numbers;
 
-   --  The direction numbers, the point the next draw returns, and the
-   --  count drawn.
+   --  The direction numbers, the shift (the first point), the point the
+   --  next draw returns, and the count drawn.
    type Sequence (D : Dimension) is record
       V       : Direction_Table (1 .. D);
+      Shift   : Point (1 .. D);
       Current : Point (1 .. D);
       Count   : Point_Count;
    end record;

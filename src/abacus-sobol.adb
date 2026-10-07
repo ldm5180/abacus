@@ -1,3 +1,4 @@
+with Abacus.Random;
 with Abacus.Sobol.Directions;
 
 package body Abacus.Sobol
@@ -40,8 +41,87 @@ is
    function Unscrambled (D : Dimension) return Sequence
    is ((D       => D,
         V       => [for J in 1 .. D => Directions_Of (J)],
+        Shift   => [others => 0],
         Current => [others => 0],
         Count   => 0));
+
+   ---------------------------------------------------------------------
+   --  The scramble.
+   ---------------------------------------------------------------------
+
+   --  A digit's place in a coordinate: place 31 is the leading digit.
+   subtype Place is Natural range 0 .. Bits - 1;
+
+   --  One row of a lower-triangular binary matrix per place: which input
+   --  digits the output digit at that place is the xor of -- itself and
+   --  some of those above it.
+   type Matrix_Rows is array (Place) of Coordinate;
+
+   --  Whether X has an odd number of ones.
+   function Odd (X : Coordinate) return Boolean is
+      Y : Coordinate := X;
+   begin
+      Y := Y xor Shift_Right (Y, 16);
+      Y := Y xor Shift_Right (Y, 8);
+      Y := Y xor Shift_Right (Y, 4);
+      Y := Y xor Shift_Right (Y, 2);
+      Y := Y xor Shift_Right (Y, 1);
+      return (Y and 1) = 1;
+   end Odd;
+
+   --  V multiplied by the matrix whose rows are L.
+   function Times (L : Matrix_Rows; V : Coordinate) return Coordinate is
+      Result : Coordinate := 0;
+   begin
+      for P in Place loop
+         if Odd (L (P) and V) then
+            Result := Result or Shift_Left (1, P);
+         end if;
+      end loop;
+      return Result;
+   end Times;
+
+   --  The low 32 bits of the next draw.
+   procedure Draw (G : in out Abacus.Random.Generator; X : out Coordinate) is
+      Wide_Draw : Unsigned_64;
+   begin
+      Abacus.Random.Next (G, Wide_Draw);
+      X := Coordinate (Wide_Draw and (Period - 1));
+   end Draw;
+
+   --  A random unit lower-triangular matrix: at each place a one, ones at
+   --  random among the places above, none below.  The leading place has
+   --  none above, and takes no draw.
+   procedure Draw_Matrix
+     (G : in out Abacus.Random.Generator; L : out Matrix_Rows)
+   is
+      Row : Coordinate;
+   begin
+      L := [others => 0];
+      for P in Place'First .. Place'Last - 1 loop
+         Draw (G, Row);
+         L (P) := (Row and not (Shift_Left (2, P) - 1)) or Shift_Left (1, P);
+      end loop;
+      L (Place'Last) := Shift_Left (1, Place'Last);
+   end Draw_Matrix;
+
+   function Scrambled
+     (D : Dimension; Seed : Interfaces.Unsigned_64) return Sequence
+   is
+      G : Abacus.Random.Generator := Abacus.Random.Seeded (Seed);
+      L : Matrix_Rows;
+   begin
+      return S : Sequence := Unscrambled (D) do
+         for J in 1 .. D loop
+            Draw (G, S.Shift (J));
+            Draw_Matrix (G, L);
+            for K in Digit loop
+               S.V (J) (K) := Times (L, S.V (J) (K));
+            end loop;
+         end loop;
+         S.Current := S.Shift;
+      end return;
+   end Scrambled;
 
    --  The digit the point after the one at index N differs in: one more
    --  than how many low bits of N are one.
@@ -64,7 +144,7 @@ is
    with Post => Point_At'Result'First = 1 and then Point_At'Result'Last = S.D
    is
       Gray : constant Unsigned_64 := N xor Shift_Right (N, 1);
-      X    : Point (1 .. S.D) := [others => 0];
+      X    : Point (1 .. S.D) := S.Shift;
    begin
       for K in Digit loop
          if (Shift_Right (Gray, K - 1) and 1) = 1 then

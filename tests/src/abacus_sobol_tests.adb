@@ -106,6 +106,49 @@ package body Abacus_Sobol_Tests is
       Assert (not Ok and then Y = [0, 0, 0, 0, 0], "none left");
    end Test_Skip;
 
+   --  The scramble agrees with a second implementation of it, the
+   --  fixture script's, point for point.
+   procedure Test_Scrambled (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      use Abacus_Sobol_Fixtures;
+      Want : constant Scrambled_Table := Scrambled;
+      S    : Sequence := Abacus.Sobol.Scrambled (Scrambled_Dimensions, Seed);
+      X    : Point (1 .. Scrambled_Dimensions);
+      Ok   : Boolean;
+   begin
+      for I in Want'Range (1) loop
+         Next (S, X, Ok);
+         for J in Want'Range (2) loop
+            Assert
+              (X (J) = Want (I, J),
+               "point" & I'Image & ", coordinate" & J'Image);
+         end loop;
+      end loop;
+   end Test_Scrambled;
+
+   --  One seed gives one stream; two seeds give two, and neither is the
+   --  unscrambled one.
+   procedure Test_Seeds (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Draws      : constant := 1_000;
+      A, B       : Sequence := Abacus.Sobol.Scrambled (6, 42);
+      C          : Sequence := Abacus.Sobol.Scrambled (6, 43);
+      Plain      : Sequence := Unscrambled (6);
+      W, X, Y, Z : Point (1 .. 6);
+      Ok         : Boolean;
+      Differs    : Natural := 0;
+   begin
+      for I in 1 .. Draws loop
+         Next (A, W, Ok);
+         Next (B, X, Ok);
+         Next (C, Y, Ok);
+         Next (Plain, Z, Ok);
+         Assert (W = X, "one seed, one stream: point" & I'Image);
+         Differs := Differs + (if W /= Y and then W /= Z then 1 else 0);
+      end loop;
+      Assert (Differs = Draws, "two seeds, two streams:" & Differs'Image);
+   end Test_Seeds;
+
    overriding
    procedure Register_Tests (T : in out Test) is
       use AUnit.Test_Cases.Registration;
@@ -118,6 +161,9 @@ package body Abacus_Sobol_Tests is
          "64 points in 64 dimensions, as scipy's");
       Register_Routine (T, Test_Skip_Far'Access, "Skipped to far indices");
       Register_Routine (T, Test_Skip'Access, "Skipping");
+      Register_Routine
+        (T, Test_Scrambled'Access, "The scramble, as a second implementation");
+      Register_Routine (T, Test_Seeds'Access, "One seed, one stream");
    end Register_Tests;
 
    overriding
