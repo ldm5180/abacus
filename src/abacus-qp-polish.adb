@@ -798,28 +798,33 @@ is
       end if;
    end Correct;
 
-   procedure Run
+   --  The bounds just read off the iterate, remembered as the last a
+   --  polish is tried from.
+   procedure Remember (Work : in out Workspace) is
+   begin
+      Work.Tried := True;
+      Work.Tried_Box := Work.Box_Side;
+      Work.Tried_Row := Work.Row_Side;
+   end Remember;
+
+   --  The problem solved with Work's sides held, corrected up to
+   --  S.Corrections times until its answer is certified: Run's search.
+   procedure Search
      (Pr     : Problem;
       S      : Settings;
       Work   : in out Workspace;
       St     : in out State;
       Passed : out Boolean)
+   with
+     Pre  => Fits_Work (Pr, Work) and then Fits_State (Pr, St),
+     Post =>
+       (if Passed then Certificate.Certified (Pr, St, S.Tol) else St = St'Old)
    is
       Cand    : State (Pr.N, Pr.K);
       Ok      : Boolean;
       Changed : Boolean;
    begin
       Passed := False;
-      if Cones.Has_Cone (Pr) then
-         return;
-      end if;
-      Read_Held (Pr, St, Work);
-      if Tried_Before (Work) then
-         return;
-      end if;
-      Work.Tried := True;
-      Work.Tried_Box := Work.Box_Side;
-      Work.Tried_Row := Work.Row_Side;
       for Round in 0 .. S.Corrections loop
          Solve_Held (Pr, Work, St, Cand, Ok);
          exit when not Ok;
@@ -832,6 +837,24 @@ is
          exit when not Changed;
          pragma Loop_Invariant (not Passed and then St = St'Loop_Entry);
       end loop;
+   end Search;
+
+   procedure Run
+     (Pr     : Problem;
+      S      : Settings;
+      Work   : in out Workspace;
+      St     : in out State;
+      Passed : out Boolean) is
+   begin
+      Passed := False;
+      if Cones.Has_Cone (Pr) then
+         return;
+      end if;
+      Read_Held (Pr, St, Work);
+      if not Tried_Before (Work) then
+         Remember (Work);
+         Search (Pr, S, Work, St, Passed);
+      end if;
    end Run;
 
 end Abacus.Qp.Polish;
