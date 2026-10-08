@@ -92,8 +92,9 @@ is
    --  rho_row 2**3, sigma 2**-20, alpha 1.6, and tolerances of 1e-10
    --  (primal) and 1e-9 (dual and complementarity).  A small rho_row
    --  keeps the general rows' duals on a fine lattice.  A polish every
-   --  100 iterations once both residuals are within 1e-3, making up to
-   --  32 corrections: an early iterate's held bounds can be dozens off.
+   --  100 iterations whatever the residuals, making up to 32 corrections:
+   --  an iterate's held bounds can be near the answer's while its
+   --  residuals are far from any threshold.
    Default_Settings : constant Settings :=
      (Rho_Shift    => 0,
       Row_Shift    => 3,
@@ -107,7 +108,7 @@ is
          Gap    => One / 1_000_000_000),
       Infeasible   => 16,
       Polish_Every => 100,
-      Polish_Below => One / 1_000,
+      Polish_Below => Nonnegative'Last,
       Corrections  => 32);
 
    --  The iterate: x, the projected box rows z and their duals y, the

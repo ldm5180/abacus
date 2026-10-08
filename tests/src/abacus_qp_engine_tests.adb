@@ -240,6 +240,19 @@ package body Abacus_Qp_Engine_Tests is
       Assert (R.Result = Certified and then R.Worst <= Millionth, Report (R));
    end Test_Tail_Bounded;
 
+   --  The homogenized ratio program: its mean row's entries run from a
+   --  thousandth to one and its scale's column is ten times the root of
+   --  n where the others are near one, so ADMM's residuals stay far
+   --  from any fixed threshold long after the bounds its iterate holds
+   --  are near the answer's.  Certified from cold by the polish, within
+   --  a billionth of the exact answer.
+   procedure Test_Ratio (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      R : constant Fixture_Run := Run_Fixture ("ratio", Default_Settings);
+   begin
+      Assert (R.Result = Certified and then R.Worst <= Billionth, Report (R));
+   end Test_Ratio;
+
    --  The deviation program at the size it is used at: 14 columns over
    --  1,500 outcomes, maximize the mean less 75 times the deviation, the
    --  weights in 0 .. 20 summing to 10.  A cone of 1,501 rows; certified
@@ -365,6 +378,7 @@ package body Abacus_Qp_Engine_Tests is
       Register_Routine (T, Test_Exhausted'Access, "Exhausted");
       Register_Routine (T, Test_Warm'Access, "A warm start");
       Register_Routine (T, Test_Spread'Access, "The spread fixture");
+      Register_Routine (T, Test_Ratio'Access, "The ratio program");
       Register_Routine (T, Test_Tail'Access, "The tail-mean linear program");
       Register_Routine
         (T, Test_Tail_Unpolished'Access, "The tail-mean program, unpolished");
