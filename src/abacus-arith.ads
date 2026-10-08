@@ -109,6 +109,19 @@ is
        else Div_Round (Wide (V), Power_Of (-S)))
    with Post => Scaled'Result in -Scaled_Bound .. Scaled_Bound;
 
+   --  How far Times_Power holds its result: past the values, so a value
+   --  stored from a held result is refused.
+   Held_Bound : constant := 2**120;
+   subtype Held is Wide range -Held_Bound .. Held_Bound;
+
+   --  The exponents Times_Power takes.
+   subtype Power_Exponent is Integer range -1_000 .. 1_000;
+
+   --  W times 2**E: exact upward, rounded to nearest downward (once to
+   --  within a shift of 30, to within a unit past it), held to
+   --  Held_Bound.
+   function Times_Power (W : Product; E : Power_Exponent) return Held;
+
    --  W held to Lo .. Hi.
    function Clamp (W : Wide; Lo, Hi : Val) return Val
    is (if W <= Wide (Lo) then Lo elsif W >= Wide (Hi) then Hi else Val (W))

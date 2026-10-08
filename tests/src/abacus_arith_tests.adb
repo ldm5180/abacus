@@ -91,10 +91,32 @@ package body Abacus_Arith_Tests is
       Assert (Scaled (Val'Last, -Widest_Exponent) = 2**27, "a long shift");
    end Test_Scaled;
 
+   --  A wide value times a power of two: exact upward, rounded once to
+   --  nearest downward (to within a unit past a shift of 30), and held
+   --  to Held_Bound either way.
+   procedure Test_Times_Power (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Big     : constant Wide := 2**100;
+      Far     : constant := 200;
+      Farther : constant := 300;
+   begin
+      Assert (Times_Power (3, 0) = 3, "times one");
+      Assert (Times_Power (-3, 40) = -3 * 2**40, "a long shift up");
+      Assert (Times_Power (6, -2) = 2, "1.5 rounds up to 2");
+      Assert (Times_Power (-5, -2) = -1, "-1.25 rounds to -1");
+      Assert (Times_Power (Big, -70) = 2**30, "down in three steps");
+      Assert (Times_Power (Big + 2**69, -70) = 2**30 + 1, "a half: up");
+      Assert (Times_Power (1, -Far) = 0, "past every place");
+      Assert (Times_Power (Big, 30) = Held_Bound, "held");
+      Assert (Times_Power (-1, Farther) = -Held_Bound, "held, negative");
+   end Test_Times_Power;
+
    overriding
    procedure Register_Tests (T : in out Test) is
       use AUnit.Test_Cases.Registration;
    begin
+      Register_Routine
+        (T, Test_Times_Power'Access, "A wide value times a power of two");
       Register_Routine
         (T, Test_Half_Times_Half'Access, "A half times a half is a quarter");
       Register_Routine

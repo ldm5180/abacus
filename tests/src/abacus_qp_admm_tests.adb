@@ -33,27 +33,42 @@ package body Abacus_Qp_Admm_Tests is
       Assert (Result = Out_Of_Range, "a diagonal past the values");
    end Test_Prepare;
 
+   --  The ratio program with its cap at Cap budgets.
+   function Ratio_Capped (Cap : Positive) return Problem is
+      Pr : Problem := Abacus_Qp_Fixtures.Load ("ratio");
+   begin
+      for R in 4 .. Pr.K loop
+         Pr.E (R, Pr.N) := -(Val (Cap) * One);
+      end loop;
+      return Pr;
+   end Ratio_Capped;
+
    --  The ratio program with its cap at forty budgets: the scale's
    --  column holds -40 in each of 150 rows, so E'E's entry for it is
    --  240,000, past the values before any step multiplies it.  One step
-   --  for every row cannot form the matrix; equilibrated, the cap rows'
-   --  steps shrink by the square of their scale, and it is formed.
+   --  for every row cannot form the matrix; equilibrated, it is formed.
+   --  At 640 budgets the entry is 61 million, and no step a row of the
+   --  scale's could take brings the problem's own matrix inside the
+   --  values: the matrix factored is the equilibrated one, whose entries
+   --  are near one whatever the problem's scale.
    procedure Test_Prepare_Stepped (T : in out AUnit.Test_Cases.Test_Case'Class)
    is
       pragma Unreferenced (T);
-      Cap    : constant := 40;
-      Pr     : Problem := Abacus_Qp_Fixtures.Load ("ratio");
+      Forty  : constant := 40;
+      Far    : constant := 640;
+      Steps  : constant Settings :=
+        (Default_Settings with delta Equilibrate => 10);
+      Pr     : Problem := Ratio_Capped (Forty);
       Work   : Workspace (Pr.N, Pr.K);
       Result : Prepare_Result;
    begin
-      for R in 4 .. Pr.K loop
-         Pr.E (R, Pr.N) := -Cap * One;
-      end loop;
-      Prepare (Pr, Default_Settings, Work, Result);
+      Prepare (Pr, (Steps with delta Equilibrate => 0), Work, Result);
       Assert (Result = Out_Of_Range, "one step");
-      Prepare
-        (Pr, (Default_Settings with delta Equilibrate => 10), Work, Result);
+      Prepare (Pr, Steps, Work, Result);
       Assert (Result = Ready, "equilibrated");
+      Pr := Ratio_Capped (Far);
+      Prepare (Pr, Steps, Work, Result);
+      Assert (Result = Ready, "equilibrated, at 640");
    end Test_Prepare_Stepped;
 
    --  Iterations bring the residuals down; a check reads them.

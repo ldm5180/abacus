@@ -58,6 +58,10 @@ is
    --  A step size for each of a run of rows or variables.
    type Shifts is array (Index range <>) of Shift;
 
+   --  A scale, 2**Scale_Shift: a variable's, or the cost's.
+   subtype Scale_Shift is Integer range -64 .. 64;
+   type Scale_Shifts is array (Index range <>) of Scale_Shift;
+
    subtype Iteration_Cap is Positive range 1 .. 1_000_000;
    subtype Check_Interval is Positive range 1 .. 1_000;
 
@@ -154,14 +158,13 @@ is
    type Places is array (Index range <>) of Index;
 
    --  What a solve works in, held by the caller so a large problem's need
-   --  not live on the stack: the iteration's factored matrix, its steps
-   --  (each box row's, general row's and proximal term's, and the general
-   --  rows in the order of their steps); and the polish's -- the bounds it
-   --  holds, the free variables and held rows in order (the first
-   --  Free_Count and Row_Count of Free_At and Row_At), E's held rows over
-   --  the free columns (A), A'A + delta P + delta**2 I and A A' + delta**2
-   --  I, factored in their leading blocks, and the bounds it last failed
-   --  from.
+   --  not live on the stack: the iteration's matrix, equilibrated and
+   --  factored, its steps and scales, and the general rows by step; and
+   --  the polish's -- the bounds it holds, the free variables and held
+   --  rows (the first Free_Count and Row_Count of Free_At and Row_At), E's
+   --  held rows over the free columns (A), A'A + delta P + delta**2 I and
+   --  A A' + delta**2 I factored in their leading blocks, and the bounds
+   --  it last failed from.
    type Workspace
      (N : Index;
       K : Count)
@@ -172,6 +175,8 @@ is
       Row_Step   : Shifts (1 .. K);
       Prox_Step  : Shifts (1 .. N);
       Row_Order  : Places (1 .. K);
+      Var_Scale  : Scale_Shifts (1 .. N);
+      Cost_Scale : Scale_Shift;
       Box_Side   : Sides (1 .. N);
       Row_Side   : Sides (1 .. K);
       Free_At    : Places (1 .. N);

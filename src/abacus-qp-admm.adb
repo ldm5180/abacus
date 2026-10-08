@@ -54,22 +54,25 @@ is
    is (P = Pr.K or else Step_At (Pr, Work, P + 1) /= Step_At (Pr, Work, P))
    with Pre => Fits_Work (Pr, Work) and then P <= Pr.K;
 
-   --  A run's exact sum of products scaled by 2**S and rounded once to
-   --  the grid.
-   function Run_Term (Sum : Product; S : Shift) return Wide
-   is (if S >= 0
-       then Div_Round (Sum, Powers_Of_Two (Frac - S))
-       else Div_Round (Sum, One * Power_Of (-S)));
+   --  The exponent the factored matrix's entry (I, J) is scaled by: the
+   --  cost's scale and both variables'.
+   function Entry_Scale (Work : Workspace; I, J : Index) return Integer
+   is (Work.Cost_Scale + Work.Var_Scale (I) + Work.Var_Scale (J))
+   with Pre => I <= Work.N and then J <= Work.N;
 
-   --  How far an entry of E'RE is held: past the values whatever else is
-   --  added, so a sum that reaches it is refused by the store.
-   Stepped_Bound : constant := 2**120;
+   subtype Entry_Exponent is Integer range -3 * 64 .. 3 * 64;
 
-   --  Entry (I, J) of E'RE, R the general rows' steps: the rows taken in
-   --  Work's order, each run of one step summed exactly at 128 bits and
-   --  rounded and scaled once.
+   --  How far an entry of the factored matrix is held: past the values
+   --  whatever else is added, so a sum that reaches it is refused by the
+   --  store.
+   Stepped_Bound : constant := Held_Bound;
+
+   --  Entry (I, J) of E'RE scaled by 2**Scale, R the general rows' steps:
+   --  the rows taken in Work's order, each run of one step summed exactly
+   --  at 128 bits and scaled and rounded once.
    function Stepped_Column_Dot
-     (Pr : Problem; Work : Workspace; I, J : Index) return Wide
+     (Pr : Problem; Work : Workspace; I, J : Index; Scale : Entry_Exponent)
+      return Wide
    with
      Pre  => Fits_Work (Pr, Work) and then I <= Pr.N and then J <= Pr.N,
      Post => Stepped_Column_Dot'Result in -Stepped_Bound .. Stepped_Bound
@@ -89,7 +92,9 @@ is
                 (-Stepped_Bound,
                  Wide'Min
                    (Stepped_Bound,
-                    Sum + Run_Term (Run, Step_At (Pr, Work, P))));
+                    Sum
+                    + Times_Power
+                        (Run, Step_At (Pr, Work, P) + Scale - Frac)));
             Run := 0;
          end if;
          pragma
@@ -102,19 +107,30 @@ is
       return Sum;
    end Stepped_Column_Dot;
 
-   --  2**S, as a value.
-   function Unit_Shift (S : Shift) return Wide
-   is (Scaled (Val (One), S));
-
-   --  The steps' diagonal at variable I: its proximal term and its box
-   --  row's step.
-   function Step_Diagonal (Work : Workspace; I : Index) return Wide
-   is (Unit_Shift (Work.Prox_Step (I)) + Unit_Shift (Work.Box_Step (I)))
+   --  The steps' diagonal at variable I, scaled by 2**Scale: its proximal
+   --  term and its box row's step.
+   function Step_Diagonal
+     (Work : Workspace; I : Index; Scale : Entry_Exponent) return Wide
+   is (Times_Power (One, Work.Prox_Step (I) + Scale)
+       + Times_Power (One, Work.Box_Step (I) + Scale))
    with Pre => I <= Work.N;
 
-   --  The lower triangle of P + diag (sigma + rho) + E'RE into L, each
-   --  row and variable at its own step; Ok is False when an entry does
-   --  not fit.
+   --  Entry (I, J) of the matrix factored: c D (P + diag (sigma + rho) +
+   --  E'RE) D, c the cost's scale and D the variables', each row and
+   --  variable at its own step.
+   function Stepped_Entry
+     (Pr : Problem; Work : Workspace; I, J : Index) return Wide
+   is (Times_Power (Wide (Pr.P (I, J)), Entry_Scale (Work, I, J))
+       + (if I = J
+          then Step_Diagonal (Work, I, Entry_Scale (Work, I, J))
+          else 0)
+       + Stepped_Column_Dot (Pr, Work, I, J, Entry_Scale (Work, I, J)))
+   with Pre => Fits_Work (Pr, Work) and then I <= Pr.N and then J <= Pr.N;
+
+   --  The lower triangle of the matrix factored into L; Ok is False when
+   --  an entry does not fit.  The problem's own matrix need not fit: a
+   --  column far larger than the rest makes its entries past the values,
+   --  the equilibrated one's are near one.
    procedure Form_Stepped
      (Pr : Problem; Work : in out Workspace; Ok : out Boolean)
    with Pre => Fits_Work (Pr, Work)
@@ -123,12 +139,7 @@ is
       Ok := True;
       for I in 1 .. Pr.N loop
          for J in 1 .. I loop
-            Store
-              (Wide (Pr.P (I, J))
-               + (if I = J then Step_Diagonal (Work, I) else 0)
-               + Stepped_Column_Dot (Pr, Work, I, J),
-               Work.L (I, J),
-               Ok);
+            Store (Stepped_Entry (Pr, Work, I, J), Work.L (I, J), Ok);
          end loop;
       end loop;
    end Form_Stepped;
@@ -142,6 +153,8 @@ is
       Work.Row_Step := [others => 0];
       Work.Prox_Step := [others => 0];
       Work.Row_Order := [others => 1];
+      Work.Var_Scale := [others => 0];
+      Work.Cost_Scale := 0;
       Work.Box_Side := [others => Free];
       Work.Row_Side := [others => Free];
       Work.Free_At := [others => 1];
@@ -157,6 +170,10 @@ is
       Work.Tried_Box := [others => Free];
       Work.Tried_Row := [others => Free];
    end Clear;
+
+   --  2**S, as a value.
+   function Unit_Shift (S : Shift) return Wide
+   is (Scaled (Val (One), S));
 
    procedure Prepare
      (Pr     : Problem;
@@ -407,6 +424,39 @@ is
       St.Z_Row := W.New_Z;
    end Update_Rows;
 
+   --  V scaled entry by entry by its variable's scale and 2**Extra.
+   procedure Scale_By_Variables
+     (Work  : Workspace;
+      Extra : Scale_Shift;
+      V     : in out Vector;
+      Ok    : in out Boolean)
+   with Pre => V'First = 1 and then V'Last = Work.N
+   is
+   begin
+      for I in V'Range loop
+         Store
+           (Times_Power (Wide (V (I)), Work.Var_Scale (I) + Extra), V (I), Ok);
+      end loop;
+   end Scale_By_Variables;
+
+   --  The matrix factored is c D M D for the iteration's M, so M x = B is
+   --  x = D (c D M D)**-1 c D B: B scaled by c D, solved, and scaled by D.
+   procedure Solve_Scaled
+     (Work : Workspace; B : in out Vector; Ok : in out Boolean)
+   with Pre => B'First = 1 and then B'Last = Work.N
+   is
+      Solved : Cholesky.Solve_Result;
+   begin
+      Scale_By_Variables (Work, Work.Cost_Scale, B, Ok);
+      if Ok then
+         Cholesky.Solve (Work.L, Work.D, B, Solved);
+         Ok := Solved = Cholesky.Solved;
+      end if;
+      if Ok then
+         Scale_By_Variables (Work, 0, B, Ok);
+      end if;
+   end Solve_Scaled;
+
    procedure Iterate
      (Pr   : Problem;
       S    : Settings;
@@ -414,9 +464,8 @@ is
       St   : in out State;
       Ok   : out Boolean)
    is
-      B      : Vector (1 .. Pr.N);
-      Solved : Cholesky.Solve_Result;
-      W      : Step_Work (Pr.K) :=
+      B : Vector (1 .. Pr.N);
+      W : Step_Work (Pr.K) :=
         (K     => Pr.K,
          Alpha => S.Alpha,
          Hat   => [others => 0],
@@ -426,8 +475,7 @@ is
       Ok := True;
       Right_Side (Pr, Work, St, B, Ok);
       if Ok then
-         Cholesky.Solve (Work.L, Work.D, B, Solved);
-         Ok := Solved = Cholesky.Solved;
+         Solve_Scaled (Work, B, Ok);
       end if;
       if Ok then
          Relax_Rows (Pr, B, St, W);

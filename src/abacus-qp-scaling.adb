@@ -29,9 +29,9 @@ is
    ---------------------------------------------------------------------
 
    --  How far a scale may go: past it a step would be clamped anyway.
-   Scale_Bound : constant := 64;
-   subtype Scale is Integer range -Scale_Bound .. Scale_Bound;
-   type Scales is array (Index range <>) of Scale;
+   Scale_Bound : constant := Scale_Shift'Last;
+   subtype Scale is Scale_Shift;
+   subtype Scales is Scale_Shifts;
 
    --  The scales of the variables, of their box rows and of the general
    --  rows, and of the cost.
@@ -234,6 +234,8 @@ is
       for R in 1 .. Pr.K loop
          Work.Row_Step (R) := Held (S.Row_Shift, 2 * Q.Row (R) - Q.Cost);
       end loop;
+      Work.Var_Scale := Q.Var;
+      Work.Cost_Scale := Q.Cost;
       Order_Rows (Pr, Work);
    end Set_Steps;
 

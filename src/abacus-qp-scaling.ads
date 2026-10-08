@@ -23,9 +23,10 @@ is
    with Pre => V /= 0;
 
    --  Work's steps for Pr: S's three shifts, equilibrated by
-   --  S.Equilibrate passes, each clamped to a Shift; a cone's rows share
-   --  one step, its first row's.  And the general rows in the order of
-   --  their steps, each step's rows in their own order.
+   --  S.Equilibrate passes, none above the setting's; a cone's rows share
+   --  one step.  The variables' and the cost's scales, which equilibrate
+   --  the matrix the iteration factors.  And the general rows in the order
+   --  of their steps, each step's rows in their own order.
    procedure Set_Steps (Pr : Problem; S : Settings; Work : in out Workspace)
    with Pre => Fits_Work (Pr, Work);
 
