@@ -130,7 +130,7 @@ is
    is
       C : Digit := 1;
    begin
-      while C < Bits and then (N / 2**(C - 1)) mod 2 = 1 loop
+      while C < Bits and then (Shift_Right (N, C - 1) and 1) = 1 loop
          pragma Loop_Invariant (C in 1 .. Bits - 1);
          pragma Loop_Variant (Increases => C);
          C := C + 1;
