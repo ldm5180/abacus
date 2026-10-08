@@ -60,8 +60,8 @@ comment.
   and instantiates every generic: keep it complete.
 - `tools/` — `shape_check.py`, the features report, and the seeded
   fixture scripts (`make_elementary.py`, `make_qp.py`, `make_socp.py`,
-  writing `tests/data/`; they need numpy, scipy, osqp, clarabel and
-  ecos), and `make_sobol.py`, which writes the Sobol direction table
+  `make_ratio.py`, writing `tests/data/`; they need numpy, scipy, osqp,
+  clarabel and ecos), and `make_sobol.py`, which writes the Sobol direction table
   `src/abacus-sobol-directions.ads` from the published numbers kept in
   `tools/sobol/` (with their licence) and the Sobol fixture.  Python
   only ever writes fixtures and that table; it never runs at build or

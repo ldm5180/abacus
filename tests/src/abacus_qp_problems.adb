@@ -2,6 +2,7 @@ with Ada.Unchecked_Deallocation;
 
 with Abacus.Arith;
 with Abacus.Elementary;
+with Abacus.Qp.Certificate;
 with Abacus.Qp.Engine;
 with Abacus.Random;
 
@@ -145,6 +146,26 @@ package body Abacus_Qp_Problems is
       Pose_Weights (Pr, Columns);
       Pose_Shortfalls (Pr, Columns);
    end Pose_Tail;
+
+   --  A unit's pull toward the bound A is at in [Lo, Hi]: down at the
+   --  lower, up at the upper, none inside.
+   function Pull (A, Lo, Hi : Val) return Val
+   is (if A = Lo then -1 elsif A = Hi then 1 else 0);
+
+   function Held_At (Pr : Problem; X : Vector) return State is
+      St : State := Cold (Pr.N, Pr.K);
+   begin
+      St.X := X;
+      St.Z := X;
+      for I in 1 .. Pr.N loop
+         St.Y (I) := Pull (X (I), Pr.Lo (I), Pr.Hi (I));
+      end loop;
+      for R in 1 .. Pr.K loop
+         St.Z_Row (R) := Val (Abacus.Qp.Certificate.Row_Of (Pr, R, X));
+         St.Y_Row (R) := Pull (St.Z_Row (R), Pr.Row_Lo (R), Pr.Row_Hi (R));
+      end loop;
+      return St;
+   end Held_At;
 
    type Workspace_Access is access Workspace;
 

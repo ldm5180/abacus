@@ -57,6 +57,13 @@ package Abacus_Qp_Problems is
      (Pr : out Problem; Columns : Positive; Seed : Interfaces.Unsigned_64)
    with Pre => Pr.N = Columns + Pr.K and then Pr.K >= 2;
 
+   --  The state holding the bounds and rows an answer X holds: z and
+   --  z_row are X and E X, and a multiplier of one unit pulls each
+   --  constraint at one of its bounds toward it, so the polish reads off
+   --  exactly the bounds X is at.
+   function Held_At (Pr : Problem; X : Vector) return State
+   with Pre => X'First = 1 and then X'Last = Pr.N;
+
    --  Solve from St with S; the outcome.
    function Solved
      (Pr : Problem; S : Settings; St : in out State) return Outcome;

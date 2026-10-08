@@ -6,10 +6,10 @@ with Abacus.Qp.Certificate;
 --  before it meets the tolerances, and on a linear program, whose answer
 --  is a vertex, it creeps; the polish turns that tail into a few solves.
 --  The solves go through the Cholesky factorization: the held rows by a
---  regularized system refined against the exact one, their multipliers
---  by least squares.  A cone is curved, and cannot be held as an
---  equality: its rows are never held, and a problem with one is not
---  polished.
+--  regularized system refined against the exact one, finer than the
+--  grid, their multipliers by least squares.  A cone is curved, and
+--  cannot be held as an equality: its rows are never held, and a problem
+--  with one is not polished.
 
 package Abacus.Qp.Polish
   with SPARK_Mode

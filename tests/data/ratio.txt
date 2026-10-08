@@ -1,0 +1,7 @@
+abacus ratio fixture (written by tools/make_ratio.py)
+seed 20261008; n 150 in 2 parts, cap 10 budgets; x = (y, k), 151 variables, 153 rows
+  correlation: mean 0.4178, largest eigenvalue 65.6919; d in [0.3207, 2.2131]; the mean row's entries in [0.000000, 0.750986]
+  Clarabel Solved; max |Clarabel - exact| = 1.381e-13
+  exact: stationarity 2.220e-16; 9 variables above zero and k; least multiplier of a bound held at zero 0.025111 (must be >= 0)
+  objective 5.801007212414e-01; k 1.125643217449; the rows' multipliers -1.160201442, -0.043029314, 0.043029314
+  y / k above zero: 11: 0.126165469777, 12: 0.024250996675, 13: 0.121711740885, 18: 0.128987429941, 51: 0.086099590320, 66: 0.322542425671, 86: 0.106027182456, 90: 0.495982646777, 113: 0.076811377756

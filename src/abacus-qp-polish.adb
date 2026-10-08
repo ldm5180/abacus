@@ -251,9 +251,43 @@ is
      Pre =>
        Fits_Work (Pr, Work) and then Fits_State (Pr, Cand) and then R <= Pr.K;
 
-   --  The held rows' gaps, and the right side of the regularized step:
-   --  delta (-(P x + q + A'lambda)) + A' gap over the free variables.
-   procedure Right_Side
+   --  The step's scale: a fine step is formed and solved 2**Delta_Shift
+   --  times finer than the grid.
+   Fine_Scale : constant := 2**Delta_Shift;
+
+   --  The largest gap a fine step is taken from: the multipliers' change
+   --  is about the gap times Fine_Scale, and a larger one is the first
+   --  steps' work, which the grid's scale does well enough.
+   Fine_Gap : constant := 2**Frac;
+
+   --  The held rows' gaps.
+   procedure Gaps
+     (Pr   : Problem;
+      Work : Workspace;
+      Cand : State;
+      C    : in out Packed_Vectors;
+      Ok   : in out Boolean)
+   with
+     Pre =>
+       Packed (Pr, Work)
+       and then Fits_State (Pr, Cand)
+       and then Fits_Vectors (Pr, C)
+   is
+   begin
+      C.Gap := [others => 0];
+      for P in 1 .. Work.Row_Count loop
+         Store (Row_Gap_Of (Pr, Work, Cand, Work.Row_At (P)), C.Gap (P), Ok);
+      end loop;
+   end Gaps;
+
+   --  Whether every held row's gap is within Fine_Gap.
+   function Small_Gaps (Work : Workspace; C : Packed_Vectors) return Boolean
+   is (for all P in 1 .. Work.Row_Count => C.Gap (P) in -Fine_Gap .. Fine_Gap)
+   with Pre => Work.Row_Count <= C.K;
+
+   --  The right side of the regularized step over the free variables,
+   --  delta (-(P x + q + A'lambda)) + A' gap, at the grid's scale.
+   procedure Coarse_Side
      (Pr   : Problem;
       Work : Workspace;
       Cand : State;
@@ -267,10 +301,6 @@ is
    is
       Pull : Val := 0;
    begin
-      C.Gap := [others => 0];
-      for P in 1 .. Work.Row_Count loop
-         Store (Row_Gap_Of (Pr, Work, Cand, Work.Row_At (P)), C.Gap (P), Ok);
-      end loop;
       C.Step := [others => 0];
       for Q in 1 .. Work.Free_Count loop
          Store (Stationarity (Pr, Work, Cand, C, Q), Pull, Ok);
@@ -280,10 +310,83 @@ is
             C.Step (Q),
             Ok);
       end loop;
-   end Right_Side;
+   end Coarse_Side;
 
-   --  The step taken: the free variables move by it, and each held row's
-   --  multiplier by (A step - gap) / delta.
+   --  The same right side Fine_Scale times finer, rounded once from the
+   --  exact sums: -(P x + q + A'lambda) + A' gap / delta.  Its rounding
+   --  is then a unit of the fine scale, where the coarse side's is a unit
+   --  of the grid, which the null space of the held rows, solved through
+   --  delta P, multiplies by 1 / delta.
+   procedure Fine_Side
+     (Pr   : Problem;
+      Work : Workspace;
+      Cand : State;
+      C    : in out Packed_Vectors;
+      Ok   : in out Boolean)
+   with
+     Pre =>
+       Packed (Pr, Work)
+       and then Fits_State (Pr, Cand)
+       and then Fits_Vectors (Pr, C)
+   is
+      Pull : Val := 0;
+   begin
+      C.Step := [others => 0];
+      for Q in 1 .. Work.Free_Count loop
+         Store (Stationarity (Pr, Work, Cand, C, Q), Pull, Ok);
+         Store
+           (Wide (Pull)
+            + Div_Round
+                (Column_Vector_Dot (Work.A, Q, C.Gap), One / Fine_Scale),
+            C.Step (Q),
+            Ok);
+      end loop;
+   end Fine_Side;
+
+   --  Whether Work's free variables are places of a state of its size.
+   function Free_Packed (Work : Workspace) return Boolean
+   is (Work.Free_Count <= Work.N
+       and then (for all Q in 1 .. Work.Free_Count =>
+                   Work.Free_At (Q) <= Work.N));
+
+   --  The free variables moved by the step, brought from 2**Finer times
+   --  the grid's scale back to it.
+   procedure Move_Free
+     (Work  : Workspace;
+      C     : Packed_Vectors;
+      Finer : Natural;
+      Cand  : in out State;
+      Ok    : in out Boolean)
+   with
+     Pre =>
+       Free_Packed (Work)
+       and then Cand.N = Work.N
+       and then C.N = Work.N
+       and then Finer <= Delta_Shift
+   is
+   begin
+      for Q in 1 .. Work.Free_Count loop
+         Store
+           (Wide (Cand.X (Work.Free_At (Q))) + Scaled (C.Step (Q), -Finer),
+            Cand.X (Work.Free_At (Q)),
+            Ok);
+      end loop;
+   end Move_Free;
+
+   --  A held row's A step - gap, at the scale of the step.
+   function Row_Change
+     (Work : Workspace; C : Packed_Vectors; P : Index; Gap : Wide) return Wide
+   is (Round_Shift (Row_Vector_Dot (Work.A, P, C.Step, 1, Work.Free_Count))
+       - Gap)
+   with
+     Pre =>
+       P <= Work.K
+       and then Work.Free_Count <= Work.N
+       and then C.N = Work.N
+       and then Gap in -Fine_Scale * Val_Bound .. Fine_Scale * Val_Bound;
+
+   --  The coarse step taken: the free variables move by it, and each held
+   --  row's multiplier by (A step - gap) / delta.
    procedure Take_Step
      (Pr   : Problem;
       Work : Workspace;
@@ -298,26 +401,43 @@ is
    is
       Change : Val := 0;
    begin
-      for Q in 1 .. Work.Free_Count loop
-         Store
-           (Wide (Cand.X (Work.Free_At (Q))) + Wide (C.Step (Q)),
-            Cand.X (Work.Free_At (Q)),
-            Ok);
-      end loop;
+      Move_Free (Work, C, 0, Cand, Ok);
       for P in 1 .. Work.Row_Count loop
-         Store
-           (Round_Shift
-              (Row_Vector_Dot (Work.A, P, C.Step, 1, Work.Free_Count))
-            - Wide (C.Gap (P)),
-            Change,
-            Ok);
+         Store (Row_Change (Work, C, P, Wide (C.Gap (P))), Change, Ok);
          Store
            (Wide (C.Lam (P)) + Scaled (Change, Delta_Shift), C.Lam (P), Ok);
       end loop;
    end Take_Step;
 
+   --  The fine step taken: the free variables move by it brought back to
+   --  the grid, and each held row's multiplier by A step - gap / delta,
+   --  both already at the multipliers' scale.
+   procedure Take_Fine_Step
+     (Pr   : Problem;
+      Work : Workspace;
+      C    : in out Packed_Vectors;
+      Cand : in out State;
+      Ok   : in out Boolean)
+   with
+     Pre =>
+       Packed (Pr, Work)
+       and then Fits_State (Pr, Cand)
+       and then Fits_Vectors (Pr, C)
+   is
+   begin
+      Move_Free (Work, C, Delta_Shift, Cand, Ok);
+      for P in 1 .. Work.Row_Count loop
+         Store
+           (Wide (C.Lam (P))
+            + Row_Change (Work, C, P, Wide (C.Gap (P)) * Fine_Scale),
+            C.Lam (P),
+            Ok);
+      end loop;
+   end Take_Fine_Step;
+
    --  One refinement of x and the held rows' multipliers against the
-   --  exact system, solved with the regularized one.
+   --  exact system, solved with the regularized one: at the fine scale
+   --  when the gaps allow and the step stays in range, else at the grid's.
    procedure Refine_X
      (Pr   : Problem;
       Work : Workspace;
@@ -331,8 +451,23 @@ is
        and then Fits_Vectors (Pr, C)
    is
       Solved : Cholesky.Solve_Result;
+      Fine   : Boolean;
    begin
-      Right_Side (Pr, Work, Cand, C, Ok);
+      Gaps (Pr, Work, Cand, C, Ok);
+      Fine := Small_Gaps (Work, C);
+      if Fine then
+         Fine_Side (Pr, Work, Cand, C, Fine);
+      end if;
+      if Fine then
+         Cholesky.Solve_Leading
+           (Work.S, Work.S_D, C.Step, Work.Free_Count, Solved);
+         Fine := Solved = Cholesky.Solved;
+      end if;
+      if Fine then
+         Take_Fine_Step (Pr, Work, C, Cand, Ok);
+         return;
+      end if;
+      Coarse_Side (Pr, Work, Cand, C, Ok);
       Cholesky.Solve_Leading
         (Work.S, Work.S_D, C.Step, Work.Free_Count, Solved);
       Ok := Ok and then Solved = Cholesky.Solved;

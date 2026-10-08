@@ -1,3 +1,5 @@
+with Ada.Unchecked_Deallocation;
+
 with AUnit.Assertions; use AUnit.Assertions;
 
 with Abacus;             use Abacus;
@@ -131,6 +133,41 @@ package body Abacus_Qp_Polish_Tests is
       Assert (Worst <= Millionth, "worst" & Worst'Image);
    end Test_Tail;
 
+   type Workspace_Access is access Workspace;
+
+   procedure Free is new
+     Ada.Unchecked_Deallocation (Workspace, Workspace_Access);
+
+   --  The held system solved to the grid: from the bounds the ratio
+   --  program's answer holds, the polish's answer leaves every gradient
+   --  within a few units of zero, and is certified.  The program's free
+   --  variables are correlated and its rows' entries small, so a step
+   --  formed at the grid's own scale and solved through the regularized
+   --  system misses the null space of the held rows by thousands of
+   --  units.
+   procedure Test_Held_To_The_Grid
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Few  : constant := 64;
+      Pr   : constant Problem := Abacus_Qp_Fixtures.Load ("ratio");
+      From : constant State :=
+        Held_At (Pr, Abacus_Qp_Fixtures.Answer ("ratio"));
+      Work : Workspace_Access := new Workspace (Pr.N, Pr.K);
+      Cand : State (Pr.N, Pr.K);
+      Ok   : Boolean;
+   begin
+      Read_Held (Pr, From, Work.all);
+      Solve_Held (Pr, Work.all, From, Cand, Ok);
+      Assert (Ok, "solved");
+      Assert
+        (Certificate.Dual_Residual (Pr, Cand) <= Few,
+         "dual residual" & Certificate.Dual_Residual (Pr, Cand)'Image);
+      Assert
+        (Certificate.Certified (Pr, Cand, Default_Settings.Tol), "certified");
+      Free (Work);
+   end Test_Held_To_The_Grid;
+
    --  A polish from nowhere near the answer is refused, and leaves the
    --  iterate as it was.
    procedure Test_Refused (T : in out AUnit.Test_Cases.Test_Case'Class) is
@@ -170,6 +207,8 @@ package body Abacus_Qp_Polish_Tests is
       Register_Routine (T, Test_Correct'Access, "One correction at a time");
       Register_Routine (T, Test_Vertex'Access, "A vertex, exactly");
       Register_Routine (T, Test_Tail'Access, "The boxed tail program");
+      Register_Routine
+        (T, Test_Held_To_The_Grid'Access, "The held system, to the grid");
       Register_Routine (T, Test_Refused'Access, "A polish refused");
       Register_Routine
         (T, Test_Cone_Not_Held'Access, "A cone is neither held nor polished");
