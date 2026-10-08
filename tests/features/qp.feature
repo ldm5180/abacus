@@ -3,9 +3,11 @@ Feature: Quadratic programs
   Minimize (1/2) x'P x + q'x subject to lo <= x <= hi and
   row_lo <= E x <= row_hi.  The answer is certified: its primal and
   dual residuals and its complementarity are computed at 128 bits and
-  each held within its tolerance.  Once the iteration is near, the
-  problem is solved exactly with the bounds the iterate holds -- the
-  polish -- and that answer is kept when it is certified.  A problem that cannot be met is
+  each held within its tolerance.  Every hundred iterations the problem
+  is solved exactly with the bounds the iterate holds -- the polish --
+  and that answer is kept when it is certified.  Each row's step suits
+  the row's own scale, so a program with a column far larger than the
+  rest is solved as readily as one in balance.  A problem that cannot be met is
   refused as infeasible, one whose objective falls without end as
   unbounded, and one whose matrix is not positive semidefinite as not
   convex.  A run of rows may instead lie in a second-order cone,
@@ -88,6 +90,12 @@ Feature: Quadratic programs
     Then the answer is certified
     And at least 40 variables are above zero
     And the answer agrees with the oracle's within 0.000001
+
+  Scenario: A ratio program posed homogenized, one column ten times the root of n where the rest are near one, agrees with its exact answer
+    Given the ratio problem from the fixtures
+    When it is solved
+    Then the answer is certified
+    And the answer agrees with the oracle's within 0.000000001
 
   Scenario: A large problem that cannot be met is refused as infeasible
     Given the infeasible problem from the fixtures
