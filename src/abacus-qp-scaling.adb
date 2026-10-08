@@ -169,8 +169,9 @@ is
       return M;
    end Cost_Level;
 
-   --  Pr's scales after Passes passes, and the cost's scale, which brings
-   --  the scaled cost's largest entry to within a factor of two of one.
+   --  Pr's scales after at most Passes passes, stopping at a pass that
+   --  moves none, and the cost's scale, which brings the scaled cost's
+   --  largest entry to within a factor of two of one.
    function Equilibrated
      (Pr : Problem; Passes : Pass_Count) return Equilibration
    with
@@ -185,7 +186,12 @@ is
          Cost => 0);
    begin
       for P in 1 .. Passes loop
-         Pass (Pr, Q);
+         declare
+            Before : constant Equilibration := Q;
+         begin
+            Pass (Pr, Q);
+            exit when Q = Before;
+         end;
       end loop;
       if Passes > 0 then
          Q.Cost := Cost_Of (Cost_Level (Pr, Q));

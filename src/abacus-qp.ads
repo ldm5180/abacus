@@ -74,7 +74,7 @@ is
    --  How many corrections of the bounds it holds a polish makes.
    subtype Correction_Count is Natural range 0 .. 1_000;
 
-   --  How many passes an equilibration makes.
+   --  How many passes an equilibration makes at most.
    subtype Pass_Count is Natural range 0 .. 64;
 
    --  The steps on the box rows, on the general rows, and of the
@@ -84,8 +84,9 @@ is
    --  the polish: tried at a check whose iteration count is a multiple of
    --  Polish_Every, when both residuals are within Polish_Below, and
    --  correcting the bounds it holds up to Corrections times; and how
-   --  many passes of equilibration set each row's and variable's step
-   --  from the three shifts (Abacus.Qp.Scaling), zero for none.
+   --  many passes of equilibration, at most, set each row's and
+   --  variable's step from the three shifts (Abacus.Qp.Scaling), zero
+   --  for none.
    type Settings is record
       Rho_Shift    : Shift;
       Row_Shift    : Shift;
@@ -101,15 +102,15 @@ is
       Equilibrate  : Pass_Count;
    end record;
 
-   --  The settings S0 measured on a problem in correlation space: rho 1,
-   --  rho_row 2**3, sigma 2**-20, alpha 1.6, and tolerances of 1e-10
-   --  (primal) and 1e-9 (dual and complementarity).  A small rho_row
-   --  keeps the general rows' duals on a fine lattice.  A polish every
-   --  100 iterations whatever the residuals, making up to 32 corrections:
-   --  an iterate's held bounds can be near the answer's while its
-   --  residuals are far from any threshold.
+   --  Ten passes of equilibration, then steps of at most rho 2**2 and
+   --  rho_row 2**3 (small, so the duals stay on a fine lattice), sigma
+   --  2**-20, alpha 1.6; tolerances of 1e-10 (primal) and 1e-9 (dual and
+   --  complementarity); a polish every 100 iterations whatever the
+   --  residuals, making up to 32 corrections, since an iterate's held
+   --  bounds can be near the answer's while its residuals are far from
+   --  any threshold.  Measured on the fixtures and on real programs.
    Default_Settings : constant Settings :=
-     (Rho_Shift    => 0,
+     (Rho_Shift    => 2,
       Row_Shift    => 3,
       Sigma_Shift  => -20,
       Alpha        => One * 8 / 5,
@@ -123,7 +124,7 @@ is
       Polish_Every => 100,
       Polish_Below => Nonnegative'Last,
       Corrections  => 32,
-      Equilibrate  => 0);
+      Equilibrate  => 10);
 
    --  The iterate: x, the projected box rows z and their duals y, the
    --  same for the general rows, and the iterations taken.  A state

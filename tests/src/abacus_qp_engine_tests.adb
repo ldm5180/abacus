@@ -253,6 +253,24 @@ package body Abacus_Qp_Engine_Tests is
       Assert (R.Result = Certified and then R.Worst <= Billionth, Report (R));
    end Test_Ratio;
 
+   --  The ratio program with its cap at 640 budgets: its scale's column
+   --  holds -640 in 150 rows, so the problem's own iteration matrix is
+   --  past the values at any step.  Certified from cold at the default
+   --  settings, which equilibrate.
+   procedure Test_Ratio_Far (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Cap : constant := 640;
+      Pr  : Problem := Abacus_Qp_Fixtures.Load ("ratio");
+      St  : State := Cold (Pr.N, Pr.K);
+   begin
+      for R in 4 .. Pr.K loop
+         Pr.E (R, Pr.N) := -(Cap * One);
+      end loop;
+      Assert
+        (Solved (Pr, Default_Settings, St) = Certified,
+         "after" & St.Iterations'Image & " iterations");
+   end Test_Ratio_Far;
+
    --  The deviation program at the size it is used at: 14 columns over
    --  1,500 outcomes, maximize the mean less 75 times the deviation, the
    --  weights in 0 .. 20 summing to 10.  A cone of 1,501 rows; certified
@@ -379,6 +397,8 @@ package body Abacus_Qp_Engine_Tests is
       Register_Routine (T, Test_Warm'Access, "A warm start");
       Register_Routine (T, Test_Spread'Access, "The spread fixture");
       Register_Routine (T, Test_Ratio'Access, "The ratio program");
+      Register_Routine
+        (T, Test_Ratio_Far'Access, "The ratio program, its cap at 640");
       Register_Routine (T, Test_Tail'Access, "The tail-mean linear program");
       Register_Routine
         (T, Test_Tail_Unpolished'Access, "The tail-mean program, unpolished");
