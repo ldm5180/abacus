@@ -168,6 +168,23 @@ package body Abacus_Qp_Polish_Tests is
       Free (Work);
    end Test_Held_To_The_Grid;
 
+   --  The ratio program after a hundred iterations: ADMM is far from its
+   --  tolerances, and the bounds its iterate holds are some dozen
+   --  corrections from the answer's; the polish makes them and certifies.
+   procedure Test_Corrections (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Iters  : constant := 100;
+      Pr     : constant Problem := Abacus_Qp_Fixtures.Load ("ratio");
+      Work   : Workspace_Access := new Workspace (Pr.N, Pr.K);
+      St     : State (Pr.N, Pr.K);
+      Passed : Boolean;
+   begin
+      Iterated (Pr, Iters, Work.all, St);
+      Run (Pr, Default_Settings, Work.all, St, Passed);
+      Assert (Passed, "certified");
+      Free (Work);
+   end Test_Corrections;
+
    --  A polish from nowhere near the answer is refused, and leaves the
    --  iterate as it was.
    procedure Test_Refused (T : in out AUnit.Test_Cases.Test_Case'Class) is
@@ -209,6 +226,8 @@ package body Abacus_Qp_Polish_Tests is
       Register_Routine (T, Test_Tail'Access, "The boxed tail program");
       Register_Routine
         (T, Test_Held_To_The_Grid'Access, "The held system, to the grid");
+      Register_Routine
+        (T, Test_Corrections'Access, "Corrections from an early iterate");
       Register_Routine (T, Test_Refused'Access, "A polish refused");
       Register_Routine
         (T, Test_Cone_Not_Held'Access, "A cone is neither held nor polished");

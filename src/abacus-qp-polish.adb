@@ -758,7 +758,7 @@ is
          return;
       end if;
       Read_Held (Pr, St, Work);
-      for Round in 0 .. Max_Corrections loop
+      for Round in 0 .. S.Corrections loop
          Solve_Held (Pr, Work, St, Cand, Ok);
          exit when not Ok;
          if Certificate.Certified (Pr, Cand, S.Tol) then

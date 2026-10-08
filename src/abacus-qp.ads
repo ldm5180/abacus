@@ -64,12 +64,16 @@ is
    --  How many iterations apart a polish is tried; zero never.
    subtype Polish_Interval is Natural range 0 .. Iteration_Cap'Last;
 
+   --  How many corrections of the bounds it holds a polish makes.
+   subtype Correction_Count is Natural range 0 .. 1_000;
+
    --  The steps on the box rows, on the general rows, and of the
    --  proximal term; the relaxation; the iteration cap; how often the
    --  residuals and the infeasibility certificates are checked; the
    --  tolerances; the infeasibility test's ratio, 2**-Infeasible; and
    --  the polish: tried at a check whose iteration count is a multiple of
-   --  Polish_Every, when both residuals are within Polish_Below.
+   --  Polish_Every, when both residuals are within Polish_Below, and
+   --  correcting the bounds it holds up to Corrections times.
    type Settings is record
       Rho_Shift    : Shift;
       Row_Shift    : Shift;
@@ -81,13 +85,15 @@ is
       Infeasible   : Natural range 0 .. Frac;
       Polish_Every : Polish_Interval;
       Polish_Below : Nonnegative;
+      Corrections  : Correction_Count;
    end record;
 
    --  The settings S0 measured on a problem in correlation space: rho 1,
    --  rho_row 2**3, sigma 2**-20, alpha 1.6, and tolerances of 1e-10
    --  (primal) and 1e-9 (dual and complementarity).  A small rho_row
    --  keeps the general rows' duals on a fine lattice.  A polish every
-   --  100 iterations once both residuals are within 1e-3.
+   --  100 iterations once both residuals are within 1e-3, making up to
+   --  32 corrections: an early iterate's held bounds can be dozens off.
    Default_Settings : constant Settings :=
      (Rho_Shift    => 0,
       Row_Shift    => 3,
@@ -101,7 +107,8 @@ is
          Gap    => One / 1_000_000_000),
       Infeasible   => 16,
       Polish_Every => 100,
-      Polish_Below => One / 1_000);
+      Polish_Below => One / 1_000,
+      Corrections  => 32);
 
    --  The iterate: x, the projected box rows z and their duals y, the
    --  same for the general rows, and the iterations taken.  A state

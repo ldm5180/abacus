@@ -51,11 +51,8 @@ is
       Changed : out Boolean)
    with Pre => Fits_Work (Pr, Work) and then Fits_State (Pr, Cand);
 
-   --  How many corrections a polish makes before it gives up.
-   Max_Corrections : constant := 4;
-
    --  St polished: Passed when the problem solved with the bounds St
-   --  holds, or with up to Max_Corrections corrections of them, is
+   --  holds, or with up to S.Corrections corrections of them, is
    --  certified, and St is then that answer; otherwise St is as it was.
    --  A problem with a cone is not polished.
    procedure Run
