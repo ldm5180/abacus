@@ -92,14 +92,21 @@ is
    Widest_Exponent : constant := 30;
    subtype Exponent is Integer range -Widest_Exponent .. Widest_Exponent;
 
+   --  2**S for an exponent's magnitude, its subtype the bound a product
+   --  with it needs.
+   subtype Exponent_Power is Wide range 1 .. 2**Widest_Exponent;
+   function Power_Of (S : Natural) return Exponent_Power
+   is (Powers_Of_Two (S))
+   with Pre => S <= Widest_Exponent;
+
    --  The magnitude V * 2**S may reach.
    Scaled_Bound : constant := Val_Bound * 2**Widest_Exponent;
 
    --  V times 2**S, rounded half away from zero when S is negative.
    function Scaled (V : Val; S : Exponent) return Wide
    is (if S >= 0
-       then Wide (V) * Powers_Of_Two (S)
-       else Div_Round (Wide (V), Powers_Of_Two (-S)))
+       then Wide (V) * Power_Of (S)
+       else Div_Round (Wide (V), Power_Of (-S)))
    with Post => Scaled'Result in -Scaled_Bound .. Scaled_Bound;
 
    --  W held to Lo .. Hi.

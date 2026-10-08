@@ -70,6 +70,27 @@ package body Abacus_Arith_Tests is
       Assert (V = -5 and then not Ok, "a later fit stores but keeps Ok");
    end Test_Store;
 
+   --  V times 2**S: exact for S at or above zero, rounded half away from
+   --  zero below it, at both ends of the exponents.
+   procedure Test_Scaled (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+   begin
+      Assert (Power_Of (0) = 1, "2**0");
+      Assert (Power_Of (Widest_Exponent) = 2**30, "2**30");
+      Assert (Scaled (3, 0) = 3, "times one");
+      Assert (Scaled (-3, 2) = -12, "times four");
+      Assert
+        (Scaled (Val'Last, Widest_Exponent) = Scaled_Bound,
+         "the largest magnitude");
+      Assert
+        (Scaled (Val'First, Widest_Exponent) = -Scaled_Bound,
+         "the largest negative magnitude");
+      Assert (Scaled (6, -2) = 2, "1.5 rounds up to 2");
+      Assert (Scaled (-6, -2) = -2, "-1.5 rounds down to -2");
+      Assert (Scaled (5, -2) = 1, "1.25 rounds to 1");
+      Assert (Scaled (Val'Last, -Widest_Exponent) = 2**27, "a long shift");
+   end Test_Scaled;
+
    overriding
    procedure Register_Tests (T : in out Test) is
       use AUnit.Test_Cases.Registration;
@@ -82,6 +103,7 @@ package body Abacus_Arith_Tests is
       Register_Routine
         (T, Test_Saturates'Access, "A result too large is held and said");
       Register_Routine (T, Test_Store'Access, "The checked store");
+      Register_Routine (T, Test_Scaled'Access, "A value times a power of two");
    end Register_Tests;
 
    overriding
