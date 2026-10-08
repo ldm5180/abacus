@@ -54,6 +54,32 @@ package body Abacus_Qp_Scaling_Tests is
          "no equilibration: the settings' own");
    end Test_One_Row;
 
+   --  A row of sixteenths would be scaled up and its step with it, but a
+   --  step is never above the setting's: its multiplier moves in units of
+   --  the grid times its step, and a coarser lattice is a coarser answer.
+   procedure Test_Never_Above (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      S    : constant Settings :=
+        (Default_Settings with delta Equilibrate => 10);
+      Pr   : constant Problem :=
+        (N      => 1,
+         K      => 1,
+         P      => [[One]],
+         Q      => [0],
+         Lo     => [0],
+         Hi     => [No_Upper],
+         E      => [[One / 16]],
+         Row_Lo => [One],
+         Row_Hi => [One],
+         Kind   => [Interval]);
+      Work : Workspace (1, 1);
+   begin
+      Set_Steps (Pr, S, Work);
+      Assert (Work.Row_Step (1) = S.Row_Shift, "the row's");
+      Assert (Work.Box_Step (1) <= S.Rho_Shift, "the box's");
+      Assert (Work.Prox_Step (1) <= S.Sigma_Shift, "the proximal term's");
+   end Test_Never_Above;
+
    --  A cone's rows are scaled together, so its projection stays the
    --  cone's: a tail row of sixteen beside one of one takes the same
    --  step, where two interval rows so posed would not.
@@ -92,6 +118,8 @@ package body Abacus_Qp_Scaling_Tests is
       Register_Routine (T, Test_Exponent'Access, "A value's exponent");
       Register_Routine (T, Test_One_Row'Access, "A row of sixteen");
       Register_Routine (T, Test_Cone_Shares'Access, "A cone's rows share");
+      Register_Routine
+        (T, Test_Never_Above'Access, "A step never above the setting's");
    end Register_Tests;
 
    overriding

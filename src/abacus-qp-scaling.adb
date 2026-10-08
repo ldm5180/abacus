@@ -197,10 +197,12 @@ is
    --  The steps.
    ---------------------------------------------------------------------
 
-   --  A shift held to the steps.
-   function Held (S : Integer) return Shift
-   is (Integer'Max (Shift'First, Integer'Min (Shift'Last, S)))
-   with Pre => S in -4 * Scale_Bound .. 4 * Scale_Bound;
+   --  A step's shift: the setting's Base moved by an equilibrated
+   --  Change, never past Base -- a larger step moves its multiplier in
+   --  coarser units of the grid -- nor below the steps.
+   function Held (Base : Shift; Change : Integer) return Shift
+   is (Integer'Max (Shift'First, Integer'Min (Base, Base + Change)))
+   with Pre => Change in -4 * Scale_Bound .. 4 * Scale_Bound;
 
    --  The general rows in the order of their steps, each step's rows in
    --  their own order.
@@ -226,11 +228,11 @@ is
       Q : constant Equilibration := Equilibrated (Pr, S.Equilibrate);
    begin
       for J in 1 .. Pr.N loop
-         Work.Box_Step (J) := Held (S.Rho_Shift + 2 * Q.Box (J) - Q.Cost);
-         Work.Prox_Step (J) := Held (S.Sigma_Shift - 2 * Q.Var (J) - Q.Cost);
+         Work.Box_Step (J) := Held (S.Rho_Shift, 2 * Q.Box (J) - Q.Cost);
+         Work.Prox_Step (J) := Held (S.Sigma_Shift, -(2 * Q.Var (J)) - Q.Cost);
       end loop;
       for R in 1 .. Pr.K loop
-         Work.Row_Step (R) := Held (S.Row_Shift + 2 * Q.Row (R) - Q.Cost);
+         Work.Row_Step (R) := Held (S.Row_Shift, 2 * Q.Row (R) - Q.Cost);
       end loop;
       Order_Rows (Pr, Work);
    end Set_Steps;

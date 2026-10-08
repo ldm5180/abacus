@@ -54,12 +54,12 @@ is
    is (P = Pr.K or else Step_At (Pr, Work, P + 1) /= Step_At (Pr, Work, P))
    with Pre => Fits_Work (Pr, Work) and then P <= Pr.K;
 
-   --  A run's exact sum of products, rounded to the grid and scaled by
-   --  2**S: at most one unit from the exact value scaled.
+   --  A run's exact sum of products scaled by 2**S and rounded once to
+   --  the grid.
    function Run_Term (Sum : Product; S : Shift) return Wide
    is (if S >= 0
-       then Round_Shift (Sum) * Power_Of (S)
-       else Div_Round (Round_Shift (Sum), Power_Of (-S)));
+       then Div_Round (Sum, Powers_Of_Two (Frac - S))
+       else Div_Round (Sum, One * Power_Of (-S)));
 
    --  How far an entry of E'RE is held: past the values whatever else is
    --  added, so a sum that reaches it is refused by the store.
