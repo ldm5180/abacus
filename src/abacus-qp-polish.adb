@@ -723,6 +723,59 @@ is
       return P;
    end Worst_Excess;
 
+   --  How many of Work's sides are held.
+   function Held_Count (S : Sides) return Natural is
+      C : Natural := 0;
+   begin
+      for I in S'Range loop
+         if S (I) /= Free then
+            C := C + 1;
+         end if;
+         pragma Loop_Invariant (C <= I - S'First + 1);
+      end loop;
+      return C;
+   end Held_Count;
+
+   --  Whether Work holds more general rows than it frees variables: the
+   --  held rows cannot then all be met.
+   function Overheld (Work : Workspace) return Boolean
+   is (Held_Count (Work.Row_Side) > Work.N - Held_Count (Work.Box_Side));
+
+   --  |Y| for a multiplier.
+   function Pull_Of (Y : Val) return Wide
+   is (if Y < 0 then -Wide (Y) else Wide (Y));
+
+   --  The held inequality, a bound or a row, whose multiplier pulls least,
+   --  to be released; none (a Pick of size zero) when every held
+   --  constraint is an equality.
+   function Weakest_Held
+     (Pr : Problem; Cand : State; Work : Workspace) return Pick
+   with Pre => Fits_Work (Pr, Work) and then Fits_State (Pr, Cand)
+   is
+      P     : Pick;
+      Least : Wide := Wide (Val'Last) + 1;
+   begin
+      for I in 1 .. Pr.N loop
+         if Work.Box_Side (I) /= Free
+           and then Pr.Lo (I) /= Pr.Hi (I)
+           and then Pull_Of (Cand.Y (I)) < Least
+         then
+            Least := Pull_Of (Cand.Y (I));
+            P := (1, False, I, Free);
+         end if;
+      end loop;
+      for R in 1 .. Pr.K loop
+         if Is_Held_Row (Work, R)
+           and then Pr.Row_Lo (R) /= Pr.Row_Hi (R)
+           and then Pull_Of (Cand.Y_Row (R)) < Least
+         then
+            Least := Pull_Of (Cand.Y_Row (R));
+            P := (1, True, R, Free);
+         end if;
+      end loop;
+      return P;
+   end Weakest_Held;
+
    procedure Correct
      (Pr      : Problem;
       Cand    : State;
@@ -733,6 +786,9 @@ is
    begin
       if P.Size = 0 then
          P := Worst_Excess (Pr, Cand, Work);
+      end if;
+      if P.Size = 0 and then Overheld (Work) then
+         P := Weakest_Held (Pr, Cand, Work);
       end if;
       Changed := P.Size > 0;
       if Changed and then P.In_Row and then P.Place <= Pr.K then

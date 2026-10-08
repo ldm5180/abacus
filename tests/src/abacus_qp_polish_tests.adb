@@ -104,6 +104,42 @@ package body Abacus_Qp_Polish_Tests is
       Assert (not Changed, "nothing wrong, nothing changed");
    end Test_Correct;
 
+   --  More rows held than variables free: the held rows cannot all be
+   --  met, so the answer misses one of them however its multipliers
+   --  stand.  With no multiplier the wrong way and no free constraint
+   --  violated, the held inequality with the weakest multiplier is
+   --  released: here the second row, whose pull is a quarter of the
+   --  first's.
+   procedure Test_Correct_Overheld
+     (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Pr      : constant Problem :=
+        (N      => 2,
+         K      => 2,
+         P      => [[0, 0], [0, 0]],
+         Q      => [-One, -2 * One],
+         Lo     => [0, 0],
+         Hi     => [One, One],
+         E      => [[One, One], [One, -One]],
+         Row_Lo => [No_Lower, -One / 2],
+         Row_Hi => [3 * One / 2, No_Upper],
+         Kind   => [Interval, Interval]);
+      Work    : Workspace (2, 2);
+      Cand    : State := Cold (2, 2);
+      Changed : Boolean;
+   begin
+      Work.Box_Side := [Free, At_Upper];
+      Work.Row_Side := [At_Upper, At_Lower];
+      Cand.X := [3 * One / 4, One];
+      Cand.Y := [0, One];
+      Cand.Y_Row := [One, -One / 4];
+      Correct (Pr, Cand, Work, Changed);
+      Assert (Changed, "changed");
+      Assert (Work.Row_Side = [At_Upper, Free], "the weaker row released");
+      Assert (Work.Box_Side = [Free, At_Upper], "the bounds kept");
+   end Test_Correct_Overheld;
+
    --  A rough iterate of a linear program polishes to its vertex exactly.
    procedure Test_Vertex (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
@@ -259,6 +295,10 @@ package body Abacus_Qp_Polish_Tests is
    begin
       Register_Routine (T, Test_Held'Access, "The bounds an iterate holds");
       Register_Routine (T, Test_Correct'Access, "One correction at a time");
+      Register_Routine
+        (T,
+         Test_Correct_Overheld'Access,
+         "More rows held than variables free");
       Register_Routine (T, Test_Vertex'Access, "A vertex, exactly");
       Register_Routine (T, Test_Tail'Access, "The boxed tail program");
       Register_Routine

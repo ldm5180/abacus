@@ -43,7 +43,9 @@ is
    --  One correction of Work's sides from Cand: the held bound whose
    --  multiplier pushes hardest the wrong way is released; failing one,
    --  the free constraint Cand lies furthest outside is held at the bound
-   --  it passes.  Changed is False when there was neither.
+   --  it passes; failing that, when more rows are held than variables
+   --  freed, the held inequality whose multiplier pulls least is
+   --  released.  Changed is False when there was none of these.
    procedure Correct
      (Pr      : Problem;
       Cand    : State;
