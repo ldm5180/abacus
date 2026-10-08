@@ -3,6 +3,7 @@ with AUnit.Assertions; use AUnit.Assertions;
 with Abacus;             use Abacus;
 with Abacus.Qp;          use Abacus.Qp;
 with Abacus.Qp.Admm;     use Abacus.Qp.Admm;
+with Abacus_Qp_Fixtures;
 with Abacus_Qp_Problems; use Abacus_Qp_Problems;
 
 package body Abacus_Qp_Admm_Tests is
@@ -31,6 +32,29 @@ package body Abacus_Qp_Admm_Tests is
          Result);
       Assert (Result = Out_Of_Range, "a diagonal past the values");
    end Test_Prepare;
+
+   --  The ratio program with its cap at forty budgets: the scale's
+   --  column holds -40 in each of 150 rows, so E'E's entry for it is
+   --  240,000, past the values before any step multiplies it.  One step
+   --  for every row cannot form the matrix; equilibrated, the cap rows'
+   --  steps shrink by the square of their scale, and it is formed.
+   procedure Test_Prepare_Stepped (T : in out AUnit.Test_Cases.Test_Case'Class)
+   is
+      pragma Unreferenced (T);
+      Cap    : constant := 40;
+      Pr     : Problem := Abacus_Qp_Fixtures.Load ("ratio");
+      Work   : Workspace (Pr.N, Pr.K);
+      Result : Prepare_Result;
+   begin
+      for R in 4 .. Pr.K loop
+         Pr.E (R, Pr.N) := -Cap * One;
+      end loop;
+      Prepare (Pr, Default_Settings, Work, Result);
+      Assert (Result = Out_Of_Range, "one step");
+      Prepare
+        (Pr, (Default_Settings with delta Equilibrate => 10), Work, Result);
+      Assert (Result = Ready, "equilibrated");
+   end Test_Prepare_Stepped;
 
    --  Iterations bring the residuals down; a check reads them.
    procedure Test_Iterate (T : in out AUnit.Test_Cases.Test_Case'Class) is
@@ -96,6 +120,8 @@ package body Abacus_Qp_Admm_Tests is
    procedure Register_Tests (T : in out Test) is
       use AUnit.Test_Cases.Registration;
    begin
+      Register_Routine
+        (T, Test_Prepare_Stepped'Access, "A column too long for one step");
       Register_Routine (T, Test_Prepare'Access, "Prepare");
       Register_Routine (T, Test_Iterate'Access, "Iterate and check");
       Register_Routine (T, Test_Near'Access, "Near enough to polish");
