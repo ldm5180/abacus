@@ -68,9 +68,68 @@ is
          (if K not in R.Lo .. R.Hi then Order (K) = Before (K)))
    with Pre => Before'First = Order'First and then Before'Last = Order'Last;
 
+   --  That of two different places one precedes the other: the order is
+   --  total.  A lemma: its body is empty, and the prover shows the
+   --  postcondition from Precedes' definition.
+   procedure Lemma_Total (Values, Keys : Long_Vector; X, Y : Place)
+   with
+     Ghost,
+     Pre  =>
+       Keys'First = Values'First
+       and then Keys'Last = Values'Last
+       and then X in Values'Range
+       and then Y in Values'Range
+       and then X /= Y
+       and then not Precedes (Values, Keys, X, Y),
+     Post => Precedes (Values, Keys, Y, X);
+
+   procedure Lemma_Total (Values, Keys : Long_Vector; X, Y : Place) is null;
+
+   --  That two places of a run of distinct places hold different
+   --  places.
+   procedure Lemma_Apart (Order : Order_Array; R : Run; A, B : Place)
+   with
+     Ghost,
+     Pre  =>
+       Within (R, Order)
+       and then Distinct (Order, R)
+       and then A in R.Lo .. R.Hi
+       and then B in R.Lo .. R.Hi
+       and then A < B,
+     Post => Order (A) /= Order (B);
+
+   procedure Lemma_Apart (Order : Order_Array; R : Run; A, B : Place) is null;
+
+   --  That places drawn one to one from distinct places are distinct:
+   --  Into (M) came from Source (M), and Taken_At undoes Source, so no
+   --  two places of Into came from one place of From.
+   procedure Lemma_Distinct
+     (From, Into, Source, Taken_At : Order_Array; R : Run)
+   with
+     Ghost,
+     Pre  =>
+       Within (R, From)
+       and then Into'First = From'First
+       and then Into'Last = From'Last
+       and then Source'First = R.Lo
+       and then Source'Last = R.Hi
+       and then Taken_At'First = R.Lo
+       and then Taken_At'Last = R.Hi
+       and then Distinct (From, R)
+       and then (for all M in R.Lo .. R.Hi =>
+                   Source (M) in R.Lo .. R.Hi
+                   and then Into (M) = From (Source (M))
+                   and then Taken_At (Source (M)) = M),
+     Post => Distinct (Into, R);
+
+   procedure Lemma_Distinct
+     (From, Into, Source, Taken_At : Order_Array; R : Run)
+   is null;
+
    --  The two halves of R in From, each sorted, merged into Into: the
    --  first half's place is taken while it precedes the second's, so
-   --  the merge is stable.  Source, ghost, is where each came from.
+   --  the merge is stable.  Source, ghost, is where each came from, and
+   --  Taken_At its inverse, which shows that no place came twice.
    procedure Merge
      (Values, Keys : Long_Vector;
       From         : Order_Array;
@@ -100,10 +159,17 @@ is
       Into         : in out Order_Array;
       R            : Run)
    is
-      Mid    : constant Place := Half (R);
-      I      : Positive := R.Lo;
-      J      : Positive := Mid + 1;
-      Source : Order_Array (R.Lo .. R.Hi) := [others => R.Lo]
+      --  The loop sees Precedes and Distinct only through the lemmas.
+      pragma
+        Annotate (GNATprove, Hide_Info, "Expression_Function_Body", Precedes);
+      pragma
+        Annotate (GNATprove, Hide_Info, "Expression_Function_Body", Distinct);
+      Mid      : constant Place := Half (R);
+      I        : Positive := R.Lo;
+      J        : Positive := Mid + 1;
+      Source   : Order_Array (R.Lo .. R.Hi) := [others => R.Lo]
+      with Ghost;
+      Taken_At : Order_Array (R.Lo .. R.Hi) := [others => R.Lo]
       with Ghost;
    begin
       for K in R.Lo .. R.Hi loop
@@ -115,17 +181,15 @@ is
             Source (K) := I;
             I := I + 1;
          else
+            if I <= Mid then
+               Lemma_Apart (From, R, I, J);
+               Lemma_Total (Values, Keys, From (I), From (J));
+            end if;
             Into (K) := From (J);
             Source (K) := J;
             J := J + 1;
          end if;
-         pragma
-           Assert (for all M in R.Lo .. K - 1 => Source (M) /= Source (K));
-         pragma Assert (for all M in R.Lo .. K - 1 => Into (M) /= Into (K));
-         pragma
-           Assert
-             (for all M in R.Lo .. K - 1 =>
-                (for all N in M + 1 .. K - 1 => Into (M) /= Into (N)));
+         Taken_At (Source (K)) := K;
          pragma Loop_Invariant (I in R.Lo .. Mid + 1);
          pragma Loop_Invariant (J in Mid + 1 .. R.Hi + 1);
          pragma Loop_Invariant ((I - R.Lo) + (J - Mid - 1) = K - R.Lo + 1);
@@ -134,8 +198,8 @@ is
              (for all M in R.Lo .. K =>
                 Into (M) = From (Source (M))
                 and then (Source (M) in R.Lo .. I - 1
-                          or else Source (M) in Mid + 1 .. J - 1));
-         pragma Loop_Invariant (Distinct (Into, (R.Lo, K)));
+                          or else Source (M) in Mid + 1 .. J - 1)
+                and then Taken_At (Source (M)) = M);
          pragma Loop_Invariant (Sorted_Between (Values, Keys, Into, R.Lo, K));
          pragma
            Loop_Invariant
@@ -145,6 +209,7 @@ is
              (if J <= R.Hi then Precedes (Values, Keys, Into (K), From (J)));
          pragma Loop_Invariant (Same_Outside (Into, Into'Loop_Entry, R));
       end loop;
+      Lemma_Distinct (From, Into, Source, Taken_At, R);
    end Merge;
 
    --  Order within R replaced by Scratch's, a rearrangement of it.
