@@ -37,7 +37,7 @@ per-element rescale ADMM needs is eleven times slower.
 | unit | holds |
 |---|---|
 | `Abacus` | `Raw`, `Wide`, `Val`, the scale, `Vector`, `Matrix` |
-| `Abacus.Arith` | the rounding, products, quotients, saturation, the checked store, powers of two |
+| `Abacus.Arith` | the rounding, products, quotients, saturation, the checked store, powers of two, a wide value times a power of two |
 | `Abacus.Quantities` | a generic giving a consumer one private type per kind of quantity, held to a range |
 | `Abacus.Text` | decimal text to a value (an sml scanner) and back |
 | `Abacus.Ieee` | binary64 and binary32 bit patterns to a value |
@@ -52,6 +52,7 @@ per-element rescale ADMM needs is eleven times slower.
 | `Abacus.Qp.Admm` | the iteration and the checks between iterations |
 | `Abacus.Qp.Certificate` | the residuals, `Certified`, and the infeasibility certificates |
 | `Abacus.Qp.Cones` | the second-order cone over a run of a vector: its norm (the proved integer root), the projection onto it and its polar, how far outside |
+| `Abacus.Qp.Scaling` | equilibration, as a step for each row and variable and the scales of the matrix the iteration factors |
 | `Abacus.Qp.Polish` | the held bounds read off an iterate, the problem solved with them held, one correction at a time |
 | `Abacus.Qp.Engine` | the solver's loop, an sml machine, and `Solve` |
 | `Abacus.Random` | SplitMix64 with an explicit state, and `Below` without bias |
@@ -83,9 +84,20 @@ what happened:
 Minimize (1/2) x'P x + q'x subject to lo <= x <= hi and row_lo <= E x
 <= row_hi.  A bound at the end of the values (`Qp.No_Lower`,
 `Qp.No_Upper`) is no bound.  The method is ADMM in the
-operator-splitting form, as OSQP: P + sigma I + rho I + rho_row E'E is
+operator-splitting form, as OSQP: P + diag (sigma + rho) + E'R E is
 factored once and each iteration solves with it, projects, and updates
-the duals; every step size is a power of two.  The caller holds the
+the duals; every step size is a power of two.  The steps are
+equilibrated (`Abacus.Qp.Scaling`): Ruiz's method, in exponents of two,
+scales the optimality system's columns and rows to a largest entry
+near one, and ADMM on that scaled problem is ADMM on the problem as
+posed with a step for each row (rho times its scale squared over the
+cost's) and a proximal term for each variable -- so the problem is
+never scaled and none of its entries is rounded.  A cone's rows share
+one step, and no step is above the setting's (2**2 on the box rows,
+2**3 on the general rows): a multiplier moves on a lattice of its step
+in units of the grid.  The matrix factored is the equilibrated one, c D
+M D, whose entries are near one whatever the problem's scale.  The
+caller holds the
 `Workspace` (N, K) -- the factor, and the polish's matrices -- so a
 large problem's need not live on the stack, and passes the iterate in
 and out, so a warm start is the last answer.
@@ -106,22 +118,43 @@ holds long before its residuals meet these tolerances, and then creeps:
 the tail-mean program in `tests/data/qp_tail.txt` (131 variables, 101
 rows) sits near 1e-6 after 40,000 iterations under every step size, and
 OSQP does not finish it in 400,000.  So every `Polish_Every` (100)
-iterations, once both residuals are within `Polish_Below` (1e-3), the
-solver reads the held bounds off the iterate (OSQP's rule), fixes the
-held variables and solves for the free ones with the held rows as
+iterations, whatever the residuals (`Polish_Below` is open by default),
+the solver reads the held bounds off the iterate (OSQP's rule), fixes
+the held variables and solves for the free ones with the held rows as
 equalities: A'A + delta P + delta**2 I, delta = 2**-12, over the free
-variables and refined against the exact system, then the rows'
-multipliers by least squares through A A' -- both by the Cholesky
-factorization of a leading block, so an attempt costs the size of the
-free set, not of the problem.  An answer that is not certified is
-corrected one constraint at a time, a wrong-signed multiplier released
-or a violated bound held, up to four times.  An answer is kept only when
-its certificate holds; otherwise the iteration goes on from where it
-was.  The tail program is certified at 2,100 iterations (90 ms), within
-5e-9 of HiGHS; at 180 columns over 250 scenarios (431 variables, 251
-rows) at 900 iterations (0.30 s), within 7.5e-9.  `Polish_Every => 0`
-turns it off, and the tail program then ends `Exhausted`, never
-`Certified`.
+variables and refined against the exact system 2**12 times finer than
+the grid -- a step formed on the grid itself comes back from the null
+space of the held rows with its rounding multiplied by 1 / delta --
+then the rows' multipliers by least squares through A A', both by the
+Cholesky factorization of a leading block, so an attempt costs the
+size of the free set, not of the problem.  An answer that is not
+certified is corrected one constraint at a time -- a wrong-signed
+multiplier released, a violated bound held, or, when more rows are held
+than variables freed, the weakest held inequality released -- up to
+`Corrections` (32) times; a polish is not tried again from the bounds
+it last failed from.  An answer is kept only when its certificate
+holds; otherwise the iteration goes on from where it was.  The tail
+program is certified at 1,000 iterations (79 ms), within 1.2e-11 of
+HiGHS; at 180 columns over 250 scenarios (431 variables, 251 rows) at
+800 iterations (0.52 s).  `Polish_Every => 0` turns it off, and the
+tail program then ends `Exhausted`, never `Certified`.
+
+**The ratio program.**  A ratio m'w / sqrt (w'C w) over w >= 0 in parts
+summing to budgets, each w_i capped, posed homogenized -- y = k w,
+minimize y'C y with m'y = 1, each part's sum of y equal to k and each
+y_i at most cap k -- puts a column ten times the root of n where the
+others are near one (k's, in every cap row) beside a row of entries
+from a thousandth to one (the mean's).  One step for every row suits
+neither: on 1,053 such programs from real data abacus certified none,
+the factored matrix past the values for most.  Equilibrated, with the
+polish above, it certifies all 1,053, in 100 iterations for most and
+1,500 at most (`tests/data/qp_ratio.txt`, 151 variables and 153 rows,
+synthetic, from `tools/make_ratio.py`: 100 iterations, 15 ms, within
+2e-12 of the exact answer).  The same data's tail-mean linear programs
+(a threshold and a shortfall per scenario, 250 to 800 variables)
+certify at 1,008 of 1,053 within the default 4,000 iterations, 1,050
+within 40,000; the few left sit at near-degenerate vertices, which a
+crossover to a vertex, not yet built, would close.
 
 **Second-order cones.**  A run of general rows may lie in a cone
 instead of an interval: `Problem.Kind` marks a row `Cone_Head` (it
@@ -146,13 +179,14 @@ standard deviation, ||(P - 1 m') w|| / sqrt (T), for 1,500 outcomes of
 14 columns, 0 <= w <= 20, sum w = 10, posed as minimize -m'w + 75 t
 with the deviation at most t, a cone of 1,501 rows
 (`tests/data/qp_deviation.txt`, from `tools/make_socp.py`) -- is certified from
-cold with the default settings at 610 iterations in 72 ms, its weights
-within 9.5e-11 of the exact answer (Clarabel's are 4.1e-6 from it,
+cold with the default settings at 210 iterations in 31 ms, its weights
+within 2.6e-11 of the exact answer (Clarabel's are 4.1e-6 from it,
 ECOS's 1.5e-7).  A caller brings such data inside the values by
 dividing the whole table by one positive constant, which leaves w where
 it was.  Its workspace is 18 MB, mostly the polish's K by K matrix, so
 it belongs on the heap.  The same cone over the 14 by 14 factor of G'G
-(||G w|| = ||L' w||) is 16 rows: 620 iterations in 2.1 ms, as close.
+(||G w|| = ||L' w||) is 16 rows: 620 iterations in 2.1 ms, as close
+(measured before equilibration).
 
 ## Scrambled Sobol sequences
 
@@ -177,11 +211,12 @@ points reach over 64 seeds.  A sequence is an object the caller holds.
 ## What is proved and what is checked
 
 `make prove` runs gnatprove at level 2 with `--checks-as-errors=on` over
-every unit in `src/`: no `pragma Assume`, no `SPARK_Mode Off`; 2,138
-checks, all proved, in 2 min 36 s from a clean object directory (gnatprove 15,
-`-j0`).  Every check also proves with `--timeout=1`, a fifth of level
-2's budget, under gnatprove 15 and 16.1 alike, so a slower runner has
-room.  Proved:
+every unit in `src/`: no `pragma Assume`, no `SPARK_Mode Off`; 2,414
+checks, all proved, in about 3 min 35 s from a clean object directory
+(gnatprove 15, `-j0`, 12 cores).  Every check also proves with
+`--timeout=1`, a fifth of level 2's budget, none of the solver's over
+0.4 s -- and still did with another proof sharing the cores (load 32) --
+so a slower runner has room.  Proved:
 
 - absence of run-time errors everywhere: no overflow, no range or index
   error, no division by zero, every loop terminating;
@@ -209,11 +244,12 @@ Checked, not proved, by the AUnit suite and the features:
   of scipy's `ndtri` (`tests/data/elementary.txt`, from
   `tools/make_elementary.py`);
 - that the solver converges: the algorithm is not proved to reach an
-  answer, nor the polish to find the bounds an answer holds, only that
-  an answer it calls certified is one.  The fixtures
-  from `tools/make_qp.py` hold it to OSQP, Clarabel and HiGHS within
-  1e-6, and `tools/make_socp.py`'s to Clarabel, ECOS and the exact
-  solution of the optimality conditions;
+  answer, nor the polish to find the bounds an answer holds, nor the
+  equilibration to balance anything, only that an answer it calls
+  certified is one.  The fixtures from `tools/make_qp.py` hold it to
+  OSQP, Clarabel and HiGHS within 1e-6, and `tools/make_socp.py`'s and
+  `tools/make_ratio.py`'s to the exact solution of the optimality
+  conditions;
 - that the Sobol points are the published ones and that a scrambled
   block is stratified and as evenly spread as scipy's
   (`tests/data/sobol.txt`, from `tools/make_sobol.py`).
@@ -243,18 +279,18 @@ contracts off), the second of two runs (`bench/results/release.csv`):
 
 | | 180 | 3,000 |
 |---|---|---|
-| dot product | 0.19 us | 2.4 us |
-| rank update Z Z', 250 observations | 1.9 ms | 0.53 s |
-| Cholesky factor | 0.63 ms | 3.3 s |
-| the two triangular solves | 0.02 ms | 7.7 ms |
-| QP in correlation space, certified | 3.4 ms (60 iterations) | 8.7 s (200 iterations) |
+| dot product | 0.24 us | 2.6 us |
+| rank update Z Z', 250 observations | 2.0 ms | 0.58 s |
+| Cholesky factor | 0.65 ms | 3.4 s |
+| the two triangular solves | 0.02 ms | 7.9 ms |
+| QP in correlation space, certified | 6.0 ms (80 iterations) | 8.1 s (100 iterations) |
 
 | | 1,000,000 | 4,000,000 |
 |---|---|---|
-| sort order, values among 4,096, keys among 2**20, scratch from the heap | 0.17 s | 0.89 s |
+| sort order, values among 4,096, keys among 2**20, scratch from the heap | 0.17 s | 0.91 s |
 
 The QP at 3,000 pays two factorizations, one of them the convexity
-check.  Timings on one box move by up to 30% between runs at the small
+check; at 180, equilibration and the polish's attempts are most of it.  Timings on one box move by up to 30% between runs at the small
 size.
 
 ## License

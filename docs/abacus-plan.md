@@ -10,7 +10,11 @@ could not (A10's note, now closed).  Three iterations of the plan, S0's
 note, the implementation's, then the follow-ups' (see Revision notes).
 A13 (second-order cones in the solver) and A14 (scrambled Sobol
 sequences) were added for statera's first consumer; see their items and
-their revision note.
+their revision note.  **(2026-10-08)** A15 (statera's W12b): the solver
+certifies the homogenized ratio program, which it never did on real
+data, and most mean-CVaR programs it did not; built, with a design
+choice left open for the near-degenerate linear programs (A15's Built
+note).
 
 abacus is fixed-point numerics for Ada 2022, proved in SPARK:
 arithmetic on scaled integers, text and IEEE conversion, elementary
@@ -109,6 +113,7 @@ generic for that (`Abacus.Quantities`).
 | `Abacus.Random` | a seeded integer generator |
 | `Abacus.Qp.Cones` | the second-order cone: norm, projection, how far outside |
 | `Abacus.Sobol` | scrambled Sobol sequences |
+| `Abacus.Qp.Scaling` | equilibration, as a step per row and variable and the scales of the matrix factored |
 
 ### 1.3 What is proved
 
@@ -661,6 +666,67 @@ Nothing needed an assumption or a lemma; these needed a shape:
   `tools/make_sobol.py`, `tools/sobol/`; `tests/data/sobol.txt`;
   sobol.feature (see the as-built note).
 
+### A15 -- The solver certifies the ratio and mean-CVaR programs
+
+- **Where:** `src/abacus-qp-polish.adb`, `-admm.adb`, `-engine`'s
+  settings in `src/abacus-qp.ads`, `src/abacus-qp-scaling.ads/.adb`
+  (new), `Arith.Times_Power`; `tools/make_ratio.py` and
+  `tests/data/qp_ratio.txt`.  statera's W12b.
+- **What is wrong:** statera's maximum-ratio objective, posed
+  homogenized (`Statera.Optimize.Sharpe`: y = k w, minimize y'C y with
+  the mean row m'y = 1, each group's sum of y / d equal to k, each y_i /
+  d_i at most cap k), never certified on the user's real buckets at any
+  step size, cap or tolerance tried: `EXHAUSTED` or `DIVERGED`.
+  Mean-CVaR's linear program (a level of loss and a shortfall a day)
+  refused at some buckets, `EXHAUSTED` at 4,000 iterations.
+- **Why (the diagnosis, on every real bucket-cycle of the user's data,
+  1,053 of each program, dumped from a scratch copy of statera):**
+  1. *The polish could not certify even from the right held set.*  Its
+     refinement formed delta r + A'gap on the grid and solved through
+     A'A + delta P + delta**2 I; in the null space of the held rows that
+     system is delta P, so the grid's rounding came back multiplied by
+     1/delta: a dual-residual floor of 2,000-4,000 units against the
+     1,100 of 1e-9, moving as 1/delta when delta moved.
+  2. *Four corrections were too few, and the gate too strict.*  ADMM's
+     iterate holds bounds a dozen corrections from the answer's after a
+     hundred iterations, while its dual residual stays far above the
+     1e-3 that gated the polish for thousands.
+  3. *One step for every row did not suit the program's scale.*  The
+     scale k's column holds -cap / budget (10 to 31 on roth) in every
+     cap row, about ten times the root of n where the others are near
+     one, and the mean row's entries run from a thousandth to one.
+     rho_row E'E put the k diagonal past the values (`DIVERGED` at the
+     first iteration for 970 of 1,053); OSQP itself, unscaled at rho 1,
+     needs 23,000-200,000 iterations on these.
+  4. *(mean-CVaR)* the same polish limits, and a tail of
+     near-degenerate vertices (below).
+- **Fix:**
+  - The polish refines 2**12 finer than the grid: the right side formed
+    from the exact sums at that scale, the step solved there and brought
+    back; the multipliers' change needs no 1/delta.  The coarse step
+    stays for a first step whose gaps are past one.
+  - `Settings.Corrections` (32) in place of four; the gate
+    `Polish_Below` open by default; a polish is not tried again from the
+    bounds it last failed from (`Polish.Tried_Before`); when more rows
+    are held than variables freed and nothing else is wrong, the held
+    inequality with the weakest multiplier is released.
+  - Equilibration (Ruiz's method, ten passes at most, in exponents of
+    two, stopping at a pass that moves nothing) sets a step per row,
+    rho E_r**2 / c, and a proximal term per variable, sigma / (c
+    D_j**2): ADMM on the scaled problem is ADMM on the problem as posed
+    with those steps, so no entry of the problem is rounded.  A cone's
+    rows share a step.  No step is above the setting's: a multiplier
+    moves on a lattice of its step in units.  The matrix factored is the
+    equilibrated one, c D M D, and the iteration solves M x = B as D (c
+    D M D)**-1 c D B.
+  - Default steps rho 2**2 (was one) and rho_row 2**3, measured.
+- **RED first:** `Abacus_Qp_Polish_Tests.Test_Held_To_The_Grid`: from
+  the ratio fixture's exact held set the polish's dual residual is 3,107
+  units, the test asks for at most 64.
+- **Gates:** `make ci`, `make prove` (and every check at
+  `--timeout=1`).
+- **Done:** see the Built note below.
+
 ## 4. Features
 
 | file | says |
@@ -671,7 +737,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
 | `elementary.feature` | each function against its definition, at the grid's resolution |
 | `stats.feature` | means and covariances on tables small enough to check by hand; order does not matter; a slid window equals a fresh one |
 | `cholesky.feature` | factor and solve; a singular matrix is refused and the column named |
-| `qp.feature` | small problems with known answers; infeasible, unbounded and non-convex problems each refused by name; a certified answer meets its tolerances; a cone holds a linear objective's answer on its boundary, and the deviation program agrees with two conic solvers |
+| `qp.feature` | small problems with known answers; infeasible, unbounded and non-convex problems each refused by name; a certified answer meets its tolerances; a cone holds a linear objective's answer on its boundary, and the deviation program agrees with two conic solvers; the homogenized ratio program agrees with its exact answer |
 | `sobol.feature` | the first points as published; a block of 2**k points puts one in each of 2**k equal intervals of every coordinate; a seed gives one stream, two seeds two |
 
 ## Revision notes
@@ -948,3 +1014,52 @@ Nothing needed an assumption or a lemma; these needed a shape:
     The seven older feature regions, the suite's registration and the
     benchmark's sink still hold package-level variables: the test
     harness's debt under the new rule, not changed here.
+
+- **A15, as built (2026-10-08):** twelve commits on `main`, each a
+  cycle logged in `docs/tdd-log.md`, and this note.  The diagnosis and the measures are
+  on the user's real data (scratch only; the fixture is synthetic).
+  - **The ratio program** (statera's direct objective), all 1,053
+    roth bucket-cycles: before, 0 certified (970 `DIVERGED`, 83
+    `EXHAUSTED`); after, 1,053, median 100 iterations, at most 1,500,
+    56 s in all (median 21 ms).  With statera's own row step (2**-3):
+    before 32, after 1,053, at most 300 iterations, 45 s.
+  - **Mean-CVaR**, all 1,053, at the default cap of 4,000: before 893
+    (median 1,100 iterations, 953 s in all); after 1,008 (median 600,
+    599 s).  The 45 left certify at a larger cap: 28 by 10,000, 34 by
+    20,000, 42 by 40,000 (median 6,900); 3 do not by 40,000.  Every one
+    of them is certified by the polish from the exact held set read off
+    HiGHS's vertex, and ADMM's held set is within one to three
+    constraints of it from the 500th iteration; their vertices are
+    near-degenerate (a row held by the iterate has a slack of 1.8e-7 at
+    the answer, inside ADMM's resolution, or two near-equal columns
+    trade places), and correcting one constraint at a time wanders.
+    What closes them is a crossover from ADMM's held set to a vertex (a
+    simplex phase), or more iterations; that choice is the user's.  Two
+    rules were measured and not kept: releasing each held row in turn
+    (14 of the 52 then left, at up to eight more solves a polish), and
+    holding the free variable whose gradient is largest (none).
+  - **Adaptive rho** (OSQP's residual-ratio rule, powers of two),
+    measured in a float model of this solver on the same programs: no
+    better than a fixed step once the polish corrects, and it thrashed
+    (72 refactorizations on one ratio program); not built.  The best
+    fixed pair differs by a hundredfold between the ratio programs (any)
+    and the linear programs (2**3 or more), which equilibration and the
+    polish together make moot at (2**2, 2**3).
+  - **Existing answers:** every fixture still certifies, nearer its
+    oracle: spread 110 -> 100 iterations, 1.7e-10 -> 1.8e-12 from OSQP's;
+    tail and tail_bounded 2,100 -> 1,000, 4.6e-9 -> 1.2e-11 and 5.4e-9 ->
+    2.3e-11 from HiGHS's; deviation 610 -> 210, 9.5e-11 -> 2.6e-11 from
+    the exact answer (dual residual 175 units of 1,100); infeasible
+    refused at 880 iterations, not 1,620; the tail program at 431
+    variables 900 -> 800 iterations but 0.32 -> 0.52 s (more polish
+    attempts); the bench's QP at 180 60 -> 80 iterations, 3.4 -> 6.0 ms,
+    at 3,000 200 -> 100 iterations, 8.7 -> 8.1 s.
+  - **The proof:** 2,414 checks, all proved, about 3 min 35 s from
+    clean (gnatprove 15, `-j0`, a quiet box); every check at
+    `--timeout=1` from clean (2 min 49 s quiet, 5 min 51 s with another
+    proof loading the box to 32), none of the changed units' over 0.4
+    s.
+  - **For statera:** the direct ratio program certifies at the
+    defaults or at its own `Row_Shift => -3`; its override is no longer
+    needed.  Mean-CVaR wants a larger `Max_Iter` until the crossover is
+    decided (40,000 leaves 3 of 1,053).
