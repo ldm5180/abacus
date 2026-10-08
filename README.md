@@ -177,9 +177,11 @@ points reach over 64 seeds.  A sequence is an object the caller holds.
 ## What is proved and what is checked
 
 `make prove` runs gnatprove at level 2 with `--checks-as-errors=on` over
-every unit in `src/`: no `pragma Assume`, no `SPARK_Mode Off`; 2,124
-checks, all proved, in 2 min 26 s from a clean object directory (gnatprove 15,
-`-j0`).  Proved:
+every unit in `src/`: no `pragma Assume`, no `SPARK_Mode Off`; 2,138
+checks, all proved, in 2 min 36 s from a clean object directory (gnatprove 15,
+`-j0`).  Every check also proves with `--timeout=1`, a fifth of level
+2's budget, under gnatprove 15 and 16.1 alike, so a slower runner has
+room.  Proved:
 
 - absence of run-time errors everywhere: no overflow, no range or index
   error, no division by zero, every loop terminating;
