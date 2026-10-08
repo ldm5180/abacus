@@ -55,6 +55,9 @@ is
    --  A step size, 2**Shift.
    subtype Shift is Integer range -30 .. 30;
 
+   --  A step size for each of a run of rows or variables.
+   type Shifts is array (Index range <>) of Shift;
+
    subtype Iteration_Cap is Positive range 1 .. 1_000_000;
    subtype Check_Interval is Positive range 1 .. 1_000;
 
@@ -67,13 +70,18 @@ is
    --  How many corrections of the bounds it holds a polish makes.
    subtype Correction_Count is Natural range 0 .. 1_000;
 
+   --  How many passes an equilibration makes.
+   subtype Pass_Count is Natural range 0 .. 64;
+
    --  The steps on the box rows, on the general rows, and of the
    --  proximal term; the relaxation; the iteration cap; how often the
    --  residuals and the infeasibility certificates are checked; the
    --  tolerances; the infeasibility test's ratio, 2**-Infeasible; and
    --  the polish: tried at a check whose iteration count is a multiple of
    --  Polish_Every, when both residuals are within Polish_Below, and
-   --  correcting the bounds it holds up to Corrections times.
+   --  correcting the bounds it holds up to Corrections times; and how
+   --  many passes of equilibration set each row's and variable's step
+   --  from the three shifts (Abacus.Qp.Scaling), zero for none.
    type Settings is record
       Rho_Shift    : Shift;
       Row_Shift    : Shift;
@@ -86,6 +94,7 @@ is
       Polish_Every : Polish_Interval;
       Polish_Below : Nonnegative;
       Corrections  : Correction_Count;
+      Equilibrate  : Pass_Count;
    end record;
 
    --  The settings S0 measured on a problem in correlation space: rho 1,
@@ -109,7 +118,8 @@ is
       Infeasible   => 16,
       Polish_Every => 100,
       Polish_Below => Nonnegative'Last,
-      Corrections  => 32);
+      Corrections  => 32,
+      Equilibrate  => 0);
 
    --  The iterate: x, the projected box rows z and their duals y, the
    --  same for the general rows, and the iterations taken.  A state
@@ -143,20 +153,24 @@ is
    --  to the problem's variables and rows.
    type Places is array (Index range <>) of Index;
 
-   --  What a solve works in, held by the caller so that a large
-   --  problem's need not live on the stack: the matrix the iteration
-   --  solves with, factored; and the polish's -- the bounds it holds,
-   --  the free variables and held rows in order (Free_At, Row_At, the
-   --  first Free_Count and Row_Count of each), E's held rows over the
-   --  free columns packed into A, and the two matrices it solves with,
-   --  A'A + delta P + delta**2 I and A A' + delta**2 I, factored in their
-   --  leading blocks.
+   --  What a solve works in, held by the caller so a large problem's need
+   --  not live on the stack: the iteration's factored matrix, its steps
+   --  (each box row's, general row's and proximal term's, and the general
+   --  rows in the order of their steps); and the polish's -- the bounds it
+   --  holds, the free variables and held rows in order (the first
+   --  Free_Count and Row_Count of Free_At and Row_At), E's held rows over
+   --  the free columns (A), and A'A + delta P + delta**2 I and A A' +
+   --  delta**2 I, factored in their leading blocks.
    type Workspace
      (N : Index;
       K : Count)
    is record
       L          : Matrix (1 .. N, 1 .. N);
       D          : Cholesky.Pivots (1 .. N);
+      Box_Step   : Shifts (1 .. N);
+      Row_Step   : Shifts (1 .. K);
+      Prox_Step  : Shifts (1 .. N);
+      Row_Order  : Places (1 .. K);
       Box_Side   : Sides (1 .. N);
       Row_Side   : Sides (1 .. K);
       Free_At    : Places (1 .. N);

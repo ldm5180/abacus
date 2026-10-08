@@ -6,6 +6,7 @@ with Abacus_Ieee_Tests;
 with Abacus_Qp_Admm_Tests;
 with Abacus_Qp_Certificate_Tests;
 with Abacus_Qp_Cones_Tests;
+with Abacus_Qp_Scaling_Tests;
 with Abacus_Qp_Engine_Tests;
 with Abacus_Qp_Polish_Tests;
 with Abacus_Qp_Tests;
@@ -40,6 +41,7 @@ package body Abacus_Suite is
    Admm   : aliased Abacus_Qp_Admm_Tests.Test;
    Cert   : aliased Abacus_Qp_Certificate_Tests.Test;
    Cones  : aliased Abacus_Qp_Cones_Tests.Test;
+   Scaled : aliased Abacus_Qp_Scaling_Tests.Test;
    Engine : aliased Abacus_Qp_Engine_Tests.Test;
    Polish : aliased Abacus_Qp_Polish_Tests.Test;
    Rand   : aliased Abacus_Random_Tests.Test;
@@ -63,6 +65,7 @@ package body Abacus_Suite is
       Add_Test (Result'Access, Admm'Access);
       Add_Test (Result'Access, Cert'Access);
       Add_Test (Result'Access, Cones'Access);
+      Add_Test (Result'Access, Scaled'Access);
       Add_Test (Result'Access, Engine'Access);
       Add_Test (Result'Access, Polish'Access);
       Add_Test (Result'Access, Rand'Access);
