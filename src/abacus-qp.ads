@@ -159,8 +159,9 @@ is
    --  rows in the order of their steps); and the polish's -- the bounds it
    --  holds, the free variables and held rows in order (the first
    --  Free_Count and Row_Count of Free_At and Row_At), E's held rows over
-   --  the free columns (A), and A'A + delta P + delta**2 I and A A' +
-   --  delta**2 I, factored in their leading blocks.
+   --  the free columns (A), A'A + delta P + delta**2 I and A A' + delta**2
+   --  I, factored in their leading blocks, and the bounds it last failed
+   --  from.
    type Workspace
      (N : Index;
       K : Count)
@@ -182,6 +183,9 @@ is
       S_D        : Cholesky.Pivots (1 .. N);
       G          : Matrix (1 .. K, 1 .. K);
       G_D        : Cholesky.Pivots (1 .. K);
+      Tried      : Boolean;
+      Tried_Box  : Sides (1 .. N);
+      Tried_Row  : Sides (1 .. K);
    end record;
 
    function Fits_Work (Pr : Problem; Work : Workspace) return Boolean

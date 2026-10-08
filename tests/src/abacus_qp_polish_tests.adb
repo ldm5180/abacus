@@ -41,6 +41,19 @@ package body Abacus_Qp_Polish_Tests is
       Assert (Ok, "iterated");
    end Iterated;
 
+   --  St moved on by Count more iterations in Work as it was prepared.
+   procedure More
+     (Pr : Problem; Count : Natural; Work : Workspace; St : in out State)
+   is
+      Ok : Boolean := True;
+   begin
+      for K in 1 .. Count loop
+         Admm.Iterate (Pr, Default_Settings, Work, St, Ok);
+         exit when not Ok;
+      end loop;
+      Assert (Ok, "iterated on");
+   end More;
+
    --  A bound is held when the constraint lies nearer it than its
    --  multiplier pulls; an equality row always is.
    procedure Test_Held (T : in out AUnit.Test_Cases.Test_Case'Class) is
@@ -200,6 +213,30 @@ package body Abacus_Qp_Polish_Tests is
       Assert (St = Cold (Pr.N, Pr.K), "the iterate kept");
    end Test_Refused;
 
+   --  A polish that failed is not tried again from the same held bounds,
+   --  which it would fail from again: the bounds read off the iterate are
+   --  remembered, and a polish from them is skipped until they change.
+   procedure Test_Not_Again (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Later  : constant := 300;
+      Pr     : constant Problem := Abacus_Qp_Fixtures.Load ("tail_bounded");
+      Work   : Workspace (Pr.N, Pr.K);
+      St     : State (Pr.N, Pr.K);
+      Passed : Boolean;
+   begin
+      Iterated (Pr, 0, Work, St);
+      Run (Pr, Default_Settings, Work, St, Passed);
+      Assert (not Passed, "refused");
+      Read_Held (Pr, St, Work);
+      Assert (Tried_Before (Work), "the same bounds: tried");
+      More (Pr, Later, Work, St);
+      Read_Held (Pr, St, Work);
+      Assert (not Tried_Before (Work), "the bounds moved: not tried");
+      Iterated (Pr, 0, Work, St);
+      Read_Held (Pr, St, Work);
+      Assert (not Tried_Before (Work), "a workspace prepared afresh");
+   end Test_Not_Again;
+
    --  A cone's rows are never held: a polish holds bounds as equalities,
    --  and a cone is curved.  A problem with a cone is not polished.
    procedure Test_Cone_Not_Held (T : in out AUnit.Test_Cases.Test_Case'Class)
@@ -229,6 +266,7 @@ package body Abacus_Qp_Polish_Tests is
       Register_Routine
         (T, Test_Corrections'Access, "Corrections from an early iterate");
       Register_Routine (T, Test_Refused'Access, "A polish refused");
+      Register_Routine (T, Test_Not_Again'Access, "Not again from one place");
       Register_Routine
         (T, Test_Cone_Not_Held'Access, "A cone is neither held nor polished");
    end Register_Tests;

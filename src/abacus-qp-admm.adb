@@ -153,6 +153,9 @@ is
       Work.S_D := [others => 1];
       Work.G := [others => [others => 0]];
       Work.G_D := [others => 1];
+      Work.Tried := False;
+      Work.Tried_Box := [others => Free];
+      Work.Tried_Row := [others => Free];
    end Clear;
 
    procedure Prepare

@@ -51,10 +51,18 @@ is
       Changed : out Boolean)
    with Pre => Fits_Work (Pr, Work) and then Fits_State (Pr, Cand);
 
+   --  Whether the bounds Work's sides hold are those the last polish
+   --  failed from, which it would fail from again.
+   function Tried_Before (Work : Workspace) return Boolean
+   is (Work.Tried
+       and then Work.Tried_Box = Work.Box_Side
+       and then Work.Tried_Row = Work.Row_Side);
+
    --  St polished: Passed when the problem solved with the bounds St
    --  holds, or with up to S.Corrections corrections of them, is
    --  certified, and St is then that answer; otherwise St is as it was.
-   --  A problem with a cone is not polished.
+   --  A problem with a cone is not polished, nor one from the bounds the
+   --  last polish failed from.
    procedure Run
      (Pr     : Problem;
       S      : Settings;

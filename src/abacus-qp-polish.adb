@@ -758,6 +758,12 @@ is
          return;
       end if;
       Read_Held (Pr, St, Work);
+      if Tried_Before (Work) then
+         return;
+      end if;
+      Work.Tried := True;
+      Work.Tried_Box := Work.Box_Side;
+      Work.Tried_Row := Work.Row_Side;
       for Round in 0 .. S.Corrections loop
          Solve_Held (Pr, Work, St, Cand, Ok);
          exit when not Ok;
