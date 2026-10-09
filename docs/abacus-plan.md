@@ -14,7 +14,9 @@ their revision note.  **(2026-10-08)** A15 (statera's W12b): the solver
 certifies the homogenized ratio program, which it never did on real
 data, and most mean-CVaR programs it did not; built, with a design
 choice left open for the near-degenerate linear programs (A15's Built
-note).
+note), which the user then made: A16, a crossover to a vertex for a
+linear program, built; every mean-CVaR program of the user's data now
+certifies.
 
 abacus is fixed-point numerics for Ada 2022, proved in SPARK:
 arithmetic on scaled integers, text and IEEE conversion, elementary
@@ -114,6 +116,8 @@ generic for that (`Abacus.Quantities`).
 | `Abacus.Qp.Cones` | the second-order cone: norm, projection, how far outside |
 | `Abacus.Sobol` | scrambled Sobol sequences |
 | `Abacus.Qp.Scaling` | equilibration, as a step per row and variable and the scales of the matrix factored |
+| `Abacus.Qp.Held` | the problem with a set of bounds held: read off an iterate, solved for a cost given, its square system both ways, its dependences, a vertex |
+| `Abacus.Qp.Crossover` | a linear program walked by pivots from the held set to a certified vertex |
 
 ### 1.3 What is proved
 
@@ -727,6 +731,53 @@ Nothing needed an assumption or a lemma; these needed a shape:
   `--timeout=1`).
 - **Done:** see the Built note below.
 
+### A16 -- A crossover to a vertex for linear programs
+
+- **Where:** `src/abacus-qp-crossover.ads/.adb` (new),
+  `src/abacus-qp-held.ads/.adb` (new: the held system taken out of the
+  polish), `-polish.adb`, `Settings.Pivots`; `tools/make_ticked.py` and
+  `tests/data/qp_ticked.txt`.
+- **What is wrong:** after A15, 45 of the user's 1,053 mean-CVaR programs
+  were not certified within the default 4,000 iterations, and 3 not by
+  40,000.  Each is certified by the polish from the exact held set, and
+  ADMM's held set is within one to three bounds of it from the 500th
+  iteration, but the vertex is near-degenerate (the outcomes are on a
+  grid of ticks, so many tie), ADMM cannot tell the last bounds apart,
+  and the polish's corrections, one bound at a time, wander.
+- **Why:** the corrections are an active-set method without a ratio
+  test: releasing a bound and holding the furthest violation is not a
+  pivot, and from a held set with free directions of no curvature it
+  moves far from the vertex.
+- **Fix:** for a linear program (P zero), the polish hands the iterate
+  to a crossover instead of its corrections (unless `Pivots` is zero):
+  - the held set read off the iterate is made a basis: a dependent held
+    inequality row released, a dependent equality given the held
+    variable with its largest entry, a dependent free column held at its
+    nearest bound (`Held.Find_Dependence`: A A' then A'A, unregularized,
+    factored with a floor), a set square but for one squared;
+  - the cost is shifted until every held multiplier has its sign (a row
+    through its row of E, a variable one for one), and the dual simplex
+    method walks to a feasible vertex (leaving the most violated free
+    constraint, entering the held inequality whose multiplier reaches
+    zero first, through `Held.Prices`);
+  - the shift is taken back and the primal simplex method walks to the
+    optimum: Dantzig's rule, Bland's after a step of no length; the ratio
+    test along the edge from `Held.Direction`, the entering constraint's
+    own range a flip;
+  - each vertex is solved through its square system
+    (`Held.Solve_Vertex`: A x = b and A'y = -c through A A' with a ridge of
+    16 units, refined), and an answer is kept only when certified.
+  The design was measured first in a float model on 85 real programs:
+  a primal walk with a phase one by infeasibility costs wandered (6 of
+  85 at 500 pivots); the shifted dual walk then the primal reached the
+  vertex in all 85 (median 4 pivots from 500 ADMM iterations).
+- **RED first:** `Abacus_Qp_Crossover_Tests` (a two-variable linear
+  program from cold), failing to compile; then
+  `Abacus_Qp_Engine_Tests.Test_Ticked`, `EXHAUSTED after 4000
+  iterations` with the polish unwired.
+- **Gates:** `make ci`, `make prove`, every check at `--timeout=1`.
+- **Done:** see the Built note below.
+
 ## 4. Features
 
 | file | says |
@@ -737,7 +788,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
 | `elementary.feature` | each function against its definition, at the grid's resolution |
 | `stats.feature` | means and covariances on tables small enough to check by hand; order does not matter; a slid window equals a fresh one |
 | `cholesky.feature` | factor and solve; a singular matrix is refused and the column named |
-| `qp.feature` | small problems with known answers; infeasible, unbounded and non-convex problems each refused by name; a certified answer meets its tolerances; a cone holds a linear objective's answer on its boundary, and the deviation program agrees with two conic solvers; the homogenized ratio program agrees with its exact answer |
+| `qp.feature` | small problems with known answers; infeasible, unbounded and non-convex problems each refused by name; a certified answer meets its tolerances; a cone holds a linear objective's answer on its boundary, and the deviation program agrees with two conic solvers; the homogenized ratio program agrees with its exact answer; a tail program whose outcomes tie is crossed over to its vertex |
 | `sobol.feature` | the first points as published; a block of 2**k points puts one in each of 2**k equal intervals of every coordinate; a seed gives one stream, two seeds two |
 
 ## Revision notes
@@ -1063,3 +1114,32 @@ Nothing needed an assumption or a lemma; these needed a shape:
     defaults or at its own `Row_Shift => -3`; its override is no longer
     needed.  Mean-CVaR wants a larger `Max_Iter` until the crossover is
     decided (40,000 leaves 3 of 1,053).
+
+- **A16, as built (2026-10-08):** five commits on `main`, each a cycle
+  logged in `docs/tdd-log.md`, and this note.
+  - **Mean-CVaR, all 1,053 roth bucket-cycles** (scratch, release build,
+    a quiet box): before (79737ac), 1,008 certified, median 600
+    iterations, 640 s in all (median 0.38 s, at most 9.4 s); after,
+    **1,053**, median 100 iterations, at most 1,300, 143 s in all (median
+    0.11 s, at most 2.1 s).  The certifying walk takes 15 pivots at the
+    median, 114 at most; a solve crosses over once at the median, 12
+    times at most (each from a new held set), 19 pivots in all at the
+    median, 433 at most.  Every one of the 45 that refused, and the 3
+    that refused at 40,000, certifies.
+  - **The ratio program (max Sharpe), all 1,053:** unchanged -- a
+    quadratic term is polished as before; the same iterations to the
+    program, the same answers bit for bit on those compared.
+  - **Fixtures:** tail and tail_bounded 1,000 -> 100 iterations (73 ->
+    10 ms), their answers within 2.9e-11 and 1.5e-11 of HiGHS's (were
+    1.2e-11 and 2.3e-11), moved by 4.0e-11 at most; ticked: certified at
+    100 (the corrections at 25,200); spread, deviation, ratio and
+    infeasible: unchanged.  The synthetic ticked family (80 seeds):
+    80 certified at 200 iterations at most, where 3 were not.
+  - **The proof:** 2,854 checks, all proved, 4 min 33 s from clean
+    (gnatprove 15, `-j0`, the box loaded to about 10 by another proof);
+    every check at `--timeout=1` from clean (3 min 36 s, load near 19),
+    none of the crossover's over 0.3 s and none of the units this item
+    changed over 0.4 s.
+  - **What was not done, and why:** an exact-rational pivot (no integer
+    beyond 128 bits); the corrections are kept for a program with a
+    quadratic term, whose answer need not be a vertex.

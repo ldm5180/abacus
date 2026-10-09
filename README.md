@@ -53,7 +53,9 @@ per-element rescale ADMM needs is eleven times slower.
 | `Abacus.Qp.Certificate` | the residuals, `Certified`, and the infeasibility certificates |
 | `Abacus.Qp.Cones` | the second-order cone over a run of a vector: its norm (the proved integer root), the projection onto it and its polar, how far outside |
 | `Abacus.Qp.Scaling` | equilibration, as a step for each row and variable and the scales of the matrix the iteration factors |
-| `Abacus.Qp.Polish` | the held bounds read off an iterate, the problem solved with them held, one correction at a time |
+| `Abacus.Qp.Held` | the problem with a set of bounds held: read off an iterate, solved for a cost given, its square system both ways, its dependences, a vertex |
+| `Abacus.Qp.Polish` | the polish: the held system solved and corrected one constraint at a time |
+| `Abacus.Qp.Crossover` | a linear program walked by pivots from the held set to a certified vertex |
 | `Abacus.Qp.Engine` | the solver's loop, an sml machine, and `Solve` |
 | `Abacus.Random` | SplitMix64 with an explicit state, and `Below` without bias |
 | `Abacus.Sobol` | Sobol sequences in up to 64 dimensions from Joe and Kuo's direction numbers, scrambled from a seed, in Gray-code order, with `Skip` and blocks of 2**M points |
@@ -133,11 +135,28 @@ multiplier released, a violated bound held, or, when more rows are held
 than variables freed, the weakest held inequality released -- up to
 `Corrections` (32) times; a polish is not tried again from the bounds
 it last failed from.  An answer is kept only when its certificate
-holds; otherwise the iteration goes on from where it was.  The tail
-program is certified at 1,000 iterations (79 ms), within 1.2e-11 of
-HiGHS; at 180 columns over 250 scenarios (431 variables, 251 rows) at
-800 iterations (0.52 s).  `Polish_Every => 0` turns it off, and the
-tail program then ends `Exhausted`, never `Certified`.
+holds; otherwise the iteration goes on from where it was.
+`Polish_Every => 0` turns it off, and the tail program then ends
+`Exhausted`, never `Certified`.
+
+**The crossover.**  A linear program's answer is a vertex, and at a
+near-degenerate one -- many outcomes tying -- ADMM's held set comes
+within a few bounds of the answer's early and then cannot tell them
+apart, while corrections one bound at a time wander.  So a linear
+program is not corrected but crossed over (`Abacus.Qp.Crossover`):
+the held set read off the iterate is made a basis (dependent rows
+released, dependent columns held, the set squared, through `A A'` and
+`A'A` factored with a floor); the cost is shifted until every held
+multiplier has its sign, and the dual simplex method walks to a
+feasible vertex; the shift is taken back and the primal simplex method
+-- Dantzig's rule, Bland's after a step of no length -- walks to the
+optimal one.  Each vertex is solved through its square system and the
+answer kept only when its certificate holds.  `Pivots` (200) caps a
+walk; zero falls back to the corrections.  The tail program is
+certified at 100 iterations (10 ms), within 2.9e-11 of HiGHS; the
+ticked tail program (`tests/data/qp_ticked.txt`, 318 variables, its
+outcomes on ticks, from `tools/make_ticked.py`) at 100, where the
+corrections took 25,200.
 
 **The ratio program.**  A ratio m'w / sqrt (w'C w) over w >= 0 in parts
 summing to budgets, each w_i capped, posed homogenized -- y = k w,
@@ -151,10 +170,10 @@ polish above, it certifies all 1,053, in 100 iterations for most and
 1,500 at most (`tests/data/qp_ratio.txt`, 151 variables and 153 rows,
 synthetic, from `tools/make_ratio.py`: 100 iterations, 15 ms, within
 2e-12 of the exact answer).  The same data's tail-mean linear programs
-(a threshold and a shortfall per scenario, 250 to 800 variables)
-certify at 1,008 of 1,053 within the default 4,000 iterations, 1,050
-within 40,000; the few left sit at near-degenerate vertices, which a
-crossover to a vertex, not yet built, would close.
+(a threshold and a shortfall per scenario, 250 to 800 variables) are
+all certified by the crossover, 1,053 of 1,053, in 100 iterations for
+most and 1,300 at most (median 0.11 s; without it 1,008 within the
+default cap).
 
 **Second-order cones.**  A run of general rows may lie in a cone
 instead of an interval: `Problem.Kind` marks a row `Cone_Head` (it
@@ -211,9 +230,9 @@ points reach over 64 seeds.  A sequence is an object the caller holds.
 ## What is proved and what is checked
 
 `make prove` runs gnatprove at level 2 with `--checks-as-errors=on` over
-every unit in `src/`: no `pragma Assume`, no `SPARK_Mode Off`; 2,414
-checks, all proved, in about 3 min 35 s from a clean object directory
-(gnatprove 15, `-j0`, 12 cores).  Every check also proves with
+every unit in `src/`: no `pragma Assume`, no `SPARK_Mode Off`; 2,854
+checks, all proved, in about 4 1/2 min from a clean object directory
+(gnatprove 15, `-j0`, 12 cores, the box shared).  Every check also proves with
 `--timeout=1`, a fifth of level 2's budget, none of the solver's over
 0.4 s -- and still did with another proof sharing the cores (load 32) --
 so a slower runner has room.  Proved:
