@@ -807,6 +807,36 @@ is
    --  The walk.
    ---------------------------------------------------------------------
 
+   --  W walked from St: Work's held set read off it and made a basis, the
+   --  cost shifted, and up to S.Pivots steps taken.
+   procedure Walk_From
+     (Pr   : Problem;
+      S    : Settings;
+      Work : in out Workspace;
+      St   : State;
+      W    : in out Walk)
+   with
+     Pre =>
+       Fits_Work (Pr, Work)
+       and then Fits_State (Pr, St)
+       and then Fits_Walk (Pr, W)
+   is
+   begin
+      Read_Held (Pr, St, Work);
+      Make_Basis (Pr, St, Work, W.Ok);
+      if W.Ok then
+         Shift (Pr, Work, St, W);
+      end if;
+      for Step in 1 .. S.Pivots loop
+         exit when W.Ended or else not W.Ok;
+         if W.Now = Dual then
+            Dual_Step (Pr, S, Work, St, W);
+         else
+            Primal_Step (Pr, S, Work, St, W);
+         end if;
+      end loop;
+   end Walk_From;
+
    procedure Run
      (Pr     : Problem;
       S      : Settings;
@@ -829,19 +859,7 @@ is
       then
          return;
       end if;
-      Read_Held (Pr, St, Work);
-      Make_Basis (Pr, St, Work, W.Ok);
-      if W.Ok then
-         Shift (Pr, Work, St, W);
-      end if;
-      for Step in 1 .. S.Pivots loop
-         exit when W.Ended or else not W.Ok;
-         if W.Now = Dual then
-            Dual_Step (Pr, S, Work, St, W);
-         else
-            Primal_Step (Pr, S, Work, St, W);
-         end if;
-      end loop;
+      Walk_From (Pr, S, Work, St, W);
       if W.Ok and then Certificate.Certified (Pr, W.Cand, S.Tol) then
          St := W.Cand;
          Passed := True;
