@@ -285,6 +285,18 @@ package body Abacus_Qp_Engine_Tests is
       Assert (R.Result = Certified and then R.Worst <= Billionth, Report (R));
    end Test_Ticked;
 
+   --  A mean-CVaR program whose two parts hold one column each, so the
+   --  budgets pin both and its vertex is degenerate (fourteen rows held
+   --  over thirteen free variables): certified within a millionth of the
+   --  exact vertex.  A crossover that cannot make a basis of the held set
+   --  must leave the polish's corrections to do it.
+   procedure Test_Pinned (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      R : constant Fixture_Run := Run_Fixture ("pinned", Default_Settings);
+   begin
+      Assert (R.Result = Certified and then R.Worst <= Millionth, Report (R));
+   end Test_Pinned;
+
    --  The deviation program at the size it is used at: 14 columns over
    --  1,500 outcomes, maximize the mean less 75 times the deviation, the
    --  weights in 0 .. 20 summing to 10.  A cone of 1,501 rows; certified
@@ -411,6 +423,8 @@ package body Abacus_Qp_Engine_Tests is
       Register_Routine (T, Test_Warm'Access, "A warm start");
       Register_Routine (T, Test_Spread'Access, "The spread fixture");
       Register_Routine (T, Test_Ratio'Access, "The ratio program");
+      Register_Routine
+        (T, Test_Pinned'Access, "A tail program its budgets pin");
       Register_Routine
         (T, Test_Ticked'Access, "The tail program, its outcomes ticked");
       Register_Routine

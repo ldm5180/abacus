@@ -158,7 +158,9 @@ is
       Remember (Work);
       if S.Pivots > 0 and then Crossover.Is_Linear (Pr) then
          Crossover.Run (Pr, S, Work, St, Passed);
-      else
+      end if;
+      if not Passed then
+         Read_Held (Pr, St, Work);
          Search (Pr, S, Work, St, Passed);
       end if;
    end Run;
