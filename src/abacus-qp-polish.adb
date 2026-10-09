@@ -23,103 +23,6 @@ is
    --  Corrections.
    ---------------------------------------------------------------------
 
-   --  A constraint picked for correction: how far it is wrong, whether it
-   --  is a row, which, and the side it is to take.
-   type Pick is record
-      Size   : Wide := 0;
-      In_Row : Boolean := False;
-      Place  : Index := Index'First;
-      To     : Side := Free;
-   end record;
-
-   --  How hard a held side's multiplier Y pushes the wrong way: a lower
-   --  bound's must not be positive, an upper's not negative.  An
-   --  equality holds either way.
-   function Wrong_Push (S : Side; Y, Lo, Hi : Val) return Wide
-   is (if Lo = Hi
-       then 0
-       elsif S = At_Lower and then Y > 0
-       then Wide (Y)
-       elsif S = At_Upper and then Y < 0
-       then -Wide (Y)
-       else 0);
-
-   --  The side a value A past [Lo, Hi] passes.
-   function Passed_Side (A : Wide; Hi : Val) return Side
-   is (if A > Wide (Hi) then At_Upper else At_Lower);
-
-   --  P with the candidate (Size, In_Row, Place, To) when it is larger.
-   procedure Keep_Larger (P : in out Pick; Candidate : Pick) is
-   begin
-      if Candidate.Size > P.Size then
-         P := Candidate;
-      end if;
-   end Keep_Larger;
-
-   --  The held bound whose multiplier pushes hardest the wrong way.
-   function Worst_Push
-     (Pr : Problem; Cand : State; Work : Workspace) return Pick
-   with Pre => Fits_Work (Pr, Work) and then Fits_State (Pr, Cand)
-   is
-      P : Pick;
-   begin
-      for I in 1 .. Pr.N loop
-         Keep_Larger
-           (P,
-            (Wrong_Push (Work.Box_Side (I), Cand.Y (I), Pr.Lo (I), Pr.Hi (I)),
-             False,
-             I,
-             Free));
-      end loop;
-      for R in 1 .. Pr.K loop
-         Keep_Larger
-           (P,
-            (Wrong_Push
-               (Work.Row_Side (R),
-                Cand.Y_Row (R),
-                Pr.Row_Lo (R),
-                Pr.Row_Hi (R)),
-             True,
-             R,
-             Free));
-      end loop;
-      return P;
-   end Worst_Push;
-
-   --  The free constraint Cand lies furthest outside.
-   function Worst_Excess
-     (Pr : Problem; Cand : State; Work : Workspace) return Pick
-   with Pre => Fits_Work (Pr, Work) and then Fits_State (Pr, Cand)
-   is
-      P : Pick;
-   begin
-      for I in 1 .. Pr.N loop
-         if Is_Free (Work, I) then
-            Keep_Larger
-              (P,
-               (Certificate.Outside (Wide (Cand.X (I)), Pr.Lo (I), Pr.Hi (I)),
-                False,
-                I,
-                Passed_Side (Wide (Cand.X (I)), Pr.Hi (I))));
-         end if;
-      end loop;
-      for R in 1 .. Pr.K loop
-         if not Is_Held_Row (Work, R) and then not Cones.In_Cone (Pr, R) then
-            Keep_Larger
-              (P,
-               (Certificate.Outside
-                  (Certificate.Row_Of (Pr, R, Cand.X),
-                   Pr.Row_Lo (R),
-                   Pr.Row_Hi (R)),
-                True,
-                R,
-                Passed_Side
-                  (Certificate.Row_Of (Pr, R, Cand.X), Pr.Row_Hi (R))));
-         end if;
-      end loop;
-      return P;
-   end Worst_Excess;
-
    --  How many of Work's sides are held.
    function Held_Count (S : Sides) return Natural is
       C : Natural := 0;
@@ -248,10 +151,11 @@ is
          return;
       end if;
       Read_Held (Pr, St, Work);
-      if not Tried_Before (Work) then
-         Remember (Work);
-         Search (Pr, S, Work, St, Passed);
+      if Tried_Before (Work) then
+         return;
       end if;
+      Remember (Work);
+      Search (Pr, S, Work, St, Passed);
    end Run;
 
 end Abacus.Qp.Polish;

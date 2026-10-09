@@ -7,6 +7,7 @@ with Abacus.Matrices;
 with Abacus.Qp;
 with Abacus.Qp.Admm;
 with Abacus.Qp.Certificate;
+with Abacus.Qp.Crossover;
 with Abacus.Qp.Cones;
 with Abacus.Qp.Engine;
 with Abacus.Qp.Held;

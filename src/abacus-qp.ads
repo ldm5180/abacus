@@ -77,6 +77,9 @@ is
    --  How many passes an equilibration makes at most.
    subtype Pass_Count is Natural range 0 .. 64;
 
+   --  How many pivots a crossover makes at most.
+   subtype Pivot_Count is Natural range 0 .. 100_000;
+
    --  The steps on the box rows, on the general rows, and of the
    --  proximal term; the relaxation; the iteration cap; how often the
    --  residuals and the infeasibility certificates are checked; the
@@ -86,7 +89,8 @@ is
    --  correcting the bounds it holds up to Corrections times; and how
    --  many passes of equilibration, at most, set each row's and
    --  variable's step from the three shifts (Abacus.Qp.Scaling), zero
-   --  for none.
+   --  for none; and how many pivots a crossover makes at most
+   --  (Abacus.Qp.Crossover), zero for none.
    type Settings is record
       Rho_Shift    : Shift;
       Row_Shift    : Shift;
@@ -100,6 +104,7 @@ is
       Polish_Below : Nonnegative;
       Corrections  : Correction_Count;
       Equilibrate  : Pass_Count;
+      Pivots       : Pivot_Count;
    end record;
 
    --  Ten passes of equilibration, then steps of at most rho 2**2 and
@@ -124,7 +129,8 @@ is
       Polish_Every => 100,
       Polish_Below => Nonnegative'Last,
       Corrections  => 32,
-      Equilibrate  => 10);
+      Equilibrate  => 10,
+      Pivots       => 200);
 
    --  The iterate: x, the projected box rows z and their duals y, the
    --  same for the general rows, and the iterations taken.  A state

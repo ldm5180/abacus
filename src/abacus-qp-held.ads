@@ -25,6 +25,18 @@ is
    function Bound_Of (S : Side; Lo, Hi : Val) return Val
    is (if S = At_Upper then Hi else Lo);
 
+   --  How hard a held side's multiplier Y pushes the wrong way: a lower
+   --  bound's must not be positive, an upper's not negative.  An
+   --  equality holds either way.
+   function Wrong_Push (S : Side; Y, Lo, Hi : Val) return Wide
+   is (if Lo = Hi
+       then 0
+       elsif S = At_Lower and then Y > 0
+       then Wide (Y)
+       elsif S = At_Upper and then Y < 0
+       then -Wide (Y)
+       else 0);
+
    --  Work's sides read off St, OSQP's rule: a bound is held when the
    --  constraint lies nearer to it than its multiplier pulls toward it.
    --  An equality row is always held; an open bound never, nor a cone's
@@ -65,6 +77,26 @@ is
        and then Fits_State (Pr, Cand)
        and then Cost'First = 1
        and then Cost'Last = Pr.N;
+
+   --  A constraint picked: how far it is wrong, whether it is a row,
+   --  which, and the side it is to take.
+   type Pick is record
+      Size   : Wide := 0;
+      In_Row : Boolean := False;
+      Place  : Index := Index'First;
+      To     : Side := Free;
+   end record;
+
+   --  The held bound whose multiplier pushes hardest the wrong way.
+   function Worst_Push
+     (Pr : Problem; Cand : State; Work : Workspace) return Pick
+   with Pre => Fits_Work (Pr, Work) and then Fits_State (Pr, Cand);
+
+   --  The free constraint Cand lies furthest outside, and the side it
+   --  passes.
+   function Worst_Excess
+     (Pr : Problem; Cand : State; Work : Workspace) return Pick
+   with Pre => Fits_Work (Pr, Work) and then Fits_State (Pr, Cand);
 
    --  Z over the free variables, packed, solving A Z = V over the held
    --  rows, packed: A the held rows over the free columns as the last
@@ -118,5 +150,25 @@ is
       Found : out Dependence;
       Ok    : out Boolean)
    with Pre => Fits_Work (Pr, Work), Post => Packed (Pr, Work);
+
+   --  The vertex Work's held set names when it is a basis, for a cost
+   --  given: each held variable at its bound, the free ones from the held
+   --  rows, A x = b, and the rows' multipliers from A'lambda = -(P x +
+   --  Cost) over the free columns, both through A A' with no more ridge
+   --  than refuses a zero pivot, and refined.  Ok is False when a value
+   --  left its range or the factorization was refused.
+   procedure Solve_Vertex
+     (Pr   : Problem;
+      Cost : Vector;
+      Work : in out Workspace;
+      Cand : in out State;
+      Ok   : out Boolean)
+   with
+     Pre  =>
+       Fits_Work (Pr, Work)
+       and then Fits_State (Pr, Cand)
+       and then Cost'First = 1
+       and then Cost'Last = Pr.N,
+     Post => Packed (Pr, Work);
 
 end Abacus.Qp.Held;

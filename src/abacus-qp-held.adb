@@ -608,6 +608,82 @@ is
    end Solve;
 
    ---------------------------------------------------------------------
+   --  Picks.
+   ---------------------------------------------------------------------
+
+   --  The side a value A past [Lo, Hi] passes.
+   function Passed_Side (A : Wide; Hi : Val) return Side
+   is (if A > Wide (Hi) then At_Upper else At_Lower);
+
+   --  P with the candidate (Size, In_Row, Place, To) when it is larger.
+   procedure Keep_Larger (P : in out Pick; Candidate : Pick) is
+   begin
+      if Candidate.Size > P.Size then
+         P := Candidate;
+      end if;
+   end Keep_Larger;
+
+   function Worst_Push
+     (Pr : Problem; Cand : State; Work : Workspace) return Pick
+   is
+      P : Pick;
+   begin
+      for I in 1 .. Pr.N loop
+         Keep_Larger
+           (P,
+            (Wrong_Push (Work.Box_Side (I), Cand.Y (I), Pr.Lo (I), Pr.Hi (I)),
+             False,
+             I,
+             Free));
+      end loop;
+      for R in 1 .. Pr.K loop
+         Keep_Larger
+           (P,
+            (Wrong_Push
+               (Work.Row_Side (R),
+                Cand.Y_Row (R),
+                Pr.Row_Lo (R),
+                Pr.Row_Hi (R)),
+             True,
+             R,
+             Free));
+      end loop;
+      return P;
+   end Worst_Push;
+
+   function Worst_Excess
+     (Pr : Problem; Cand : State; Work : Workspace) return Pick
+   is
+      P : Pick;
+   begin
+      for I in 1 .. Pr.N loop
+         if Is_Free (Work, I) then
+            Keep_Larger
+              (P,
+               (Certificate.Outside (Wide (Cand.X (I)), Pr.Lo (I), Pr.Hi (I)),
+                False,
+                I,
+                Passed_Side (Wide (Cand.X (I)), Pr.Hi (I))));
+         end if;
+      end loop;
+      for R in 1 .. Pr.K loop
+         if not Is_Held_Row (Work, R) and then not Cones.In_Cone (Pr, R) then
+            Keep_Larger
+              (P,
+               (Certificate.Outside
+                  (Certificate.Row_Of (Pr, R, Cand.X),
+                   Pr.Row_Lo (R),
+                   Pr.Row_Hi (R)),
+                True,
+                R,
+                Passed_Side
+                  (Certificate.Row_Of (Pr, R, Cand.X), Pr.Row_Hi (R))));
+         end if;
+      end loop;
+      return P;
+   end Worst_Excess;
+
+   ---------------------------------------------------------------------
    --  The square system and its dependences.
    ---------------------------------------------------------------------
 
@@ -791,5 +867,115 @@ is
          Column_Dependence (Pr, Work, Found.Column, Ok);
       end if;
    end Find_Dependence;
+
+   ---------------------------------------------------------------------
+   --  A vertex.
+   ---------------------------------------------------------------------
+
+   --  The ridge a vertex's A A' is factored with: a few units, only so a
+   --  pivot of exactly zero is refused; the square A needs none.
+   Vertex_Ridge : constant := 16;
+
+   --  How many times a vertex's free variables are brought to its rows.
+   Vertex_Rounds : constant := 3;
+
+   --  A A' + Vertex_Ridge I, factored into G's leading block.
+   procedure Form_Vertex_G
+     (Pr : Problem; Work : in out Workspace; Ok : in out Boolean)
+   with Pre => Packed (Pr, Work), Post => Packed (Pr, Work)
+   is
+      Outcome : Cholesky.Factor_Outcome;
+   begin
+      for P in 1 .. Work.Row_Count loop
+         for R in 1 .. P loop
+            Store (Row_Entry (Work, P, R, Vertex_Ridge), Work.G (P, R), Ok);
+         end loop;
+      end loop;
+      Cholesky.Factor_Leading (Work.G, Work.G_D, Work.Row_Count, 1, Outcome);
+      Ok := Ok and then Outcome.Result = Cholesky.Factored;
+   end Form_Vertex_G;
+
+   --  Cand's held variables at their bounds, and its free ones moved by
+   --  A**-1 times the held rows' gaps, Vertex_Rounds times.
+   procedure Place_Vertex
+     (Pr : Problem; Work : Workspace; Cand : in out State; Ok : in out Boolean)
+   with Pre => Packed (Pr, Work) and then Fits_State (Pr, Cand)
+   is
+      V : Vector (1 .. Pr.K);
+      Z : Vector (1 .. Pr.N);
+   begin
+      for I in 1 .. Pr.N loop
+         if not Is_Free (Work, I) then
+            Cand.X (I) := Bound_Of (Work.Box_Side (I), Pr.Lo (I), Pr.Hi (I));
+         end if;
+      end loop;
+      for Round in 1 .. Vertex_Rounds loop
+         V := [others => 0];
+         for P in 1 .. Work.Row_Count loop
+            Store (Row_Gap_Of (Pr, Work, Cand, Work.Row_At (P)), V (P), Ok);
+         end loop;
+         Direction (Pr, Work, V, Z, Ok);
+         exit when not Ok;
+         for Q in 1 .. Work.Free_Count loop
+            Store
+              (Wide (Cand.X (Work.Free_At (Q))) + Wide (Z (Q)),
+               Cand.X (Work.Free_At (Q)),
+               Ok);
+         end loop;
+      end loop;
+   end Place_Vertex;
+
+   --  Cand's held rows' multipliers from the free variables' gradient
+   --  Gr: A'lambda = -Gr over the free columns.
+   procedure Price_Vertex
+     (Pr   : Problem;
+      Work : Workspace;
+      Gr   : Vector;
+      Cand : in out State;
+      Ok   : in out Boolean)
+   with
+     Pre =>
+       Packed (Pr, Work)
+       and then Fits_State (Pr, Cand)
+       and then Gr'First = 1
+       and then Gr'Last = Pr.N
+   is
+      C    : Vector (1 .. Pr.N) := [others => 0];
+      W    : Vector (1 .. Pr.K);
+      Done : Boolean;
+   begin
+      for Q in 1 .. Work.Free_Count loop
+         Store (-Wide (Gr (Work.Free_At (Q))), C (Q), Ok);
+      end loop;
+      Prices (Pr, Work, C, W, Done);
+      Ok := Ok and then Done;
+      Cand.Y_Row := [others => 0];
+      for P in 1 .. Work.Row_Count loop
+         Cand.Y_Row (Work.Row_At (P)) := W (P);
+      end loop;
+   end Price_Vertex;
+
+   procedure Solve_Vertex
+     (Pr   : Problem;
+      Cost : Vector;
+      Work : in out Workspace;
+      Cand : in out State;
+      Ok   : out Boolean)
+   is
+      Gr : Vector (1 .. Pr.N);
+      C  : constant Packed_Vectors (Pr.N, Pr.K) :=
+        (Pr.N, Pr.K, [others => 0], [others => 0], [others => 0], Cost);
+   begin
+      Ok := True;
+      Pack (Pr, Work);
+      Form_A (Pr, Work);
+      Form_Vertex_G (Pr, Work, Ok);
+      if Ok then
+         Place_Vertex (Pr, Work, Cand, Ok);
+      end if;
+      Gradient (Pr, C, Cand, Gr, Ok);
+      Price_Vertex (Pr, Work, Gr, Cand, Ok);
+      Settle (Pr, Work, Gr, Cand, Ok);
+   end Solve_Vertex;
 
 end Abacus.Qp.Held;
