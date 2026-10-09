@@ -1,4 +1,5 @@
 with Abacus.Qp.Cones;
+with Abacus.Qp.Crossover;
 with Abacus.Qp.Held; use Abacus.Qp.Held;
 
 package body Abacus.Qp.Polish
@@ -155,7 +156,11 @@ is
          return;
       end if;
       Remember (Work);
-      Search (Pr, S, Work, St, Passed);
+      if S.Pivots > 0 and then Crossover.Is_Linear (Pr) then
+         Crossover.Run (Pr, S, Work, St, Passed);
+      else
+         Search (Pr, S, Work, St, Passed);
+      end if;
    end Run;
 
 end Abacus.Qp.Polish;

@@ -234,11 +234,12 @@ package body Abacus_Qp_Polish_Tests is
       Free (Work);
    end Test_Corrections;
 
-   --  A polish from nowhere near the answer is refused, and leaves the
-   --  iterate as it was.
+   --  A polish from nowhere near the answer of a program with a quadratic
+   --  term is refused, and leaves the iterate as it was.  (A linear one is
+   --  crossed over, from anywhere: Abacus_Qp_Crossover_Tests.)
    procedure Test_Refused (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
-      Pr     : constant Problem := Abacus_Qp_Fixtures.Load ("tail_bounded");
+      Pr     : constant Problem := Abacus_Qp_Fixtures.Load ("spread");
       Work   : Workspace (Pr.N, Pr.K);
       St     : State (Pr.N, Pr.K);
       Passed : Boolean;
@@ -255,7 +256,7 @@ package body Abacus_Qp_Polish_Tests is
    procedure Test_Not_Again (T : in out AUnit.Test_Cases.Test_Case'Class) is
       pragma Unreferenced (T);
       Later  : constant := 300;
-      Pr     : constant Problem := Abacus_Qp_Fixtures.Load ("tail_bounded");
+      Pr     : constant Problem := Abacus_Qp_Fixtures.Load ("spread");
       Work   : Workspace (Pr.N, Pr.K);
       St     : State (Pr.N, Pr.K);
       Passed : Boolean;

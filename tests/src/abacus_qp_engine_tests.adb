@@ -271,6 +271,20 @@ package body Abacus_Qp_Engine_Tests is
          "after" & St.Iterations'Image & " iterations");
    end Test_Ratio_Far;
 
+   --  The tail-mean program with its outcomes on a grid of ticks, at the
+   --  size its first consumer poses it (318 variables, 155 rows): its
+   --  vertex is near-degenerate, and ADMM's held set, a few bounds from
+   --  the answer's from early on, takes the polish's corrections 25,000
+   --  iterations to settle.  The crossover walks from it to the vertex:
+   --  certified within the default cap, within a billionth of the exact
+   --  one.
+   procedure Test_Ticked (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      R : constant Fixture_Run := Run_Fixture ("ticked", Default_Settings);
+   begin
+      Assert (R.Result = Certified and then R.Worst <= Billionth, Report (R));
+   end Test_Ticked;
+
    --  The deviation program at the size it is used at: 14 columns over
    --  1,500 outcomes, maximize the mean less 75 times the deviation, the
    --  weights in 0 .. 20 summing to 10.  A cone of 1,501 rows; certified
@@ -397,6 +411,8 @@ package body Abacus_Qp_Engine_Tests is
       Register_Routine (T, Test_Warm'Access, "A warm start");
       Register_Routine (T, Test_Spread'Access, "The spread fixture");
       Register_Routine (T, Test_Ratio'Access, "The ratio program");
+      Register_Routine
+        (T, Test_Ticked'Access, "The tail program, its outcomes ticked");
       Register_Routine
         (T, Test_Ratio_Far'Access, "The ratio program, its cap at 640");
       Register_Routine (T, Test_Tail'Access, "The tail-mean linear program");

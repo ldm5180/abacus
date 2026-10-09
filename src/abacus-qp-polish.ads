@@ -63,7 +63,9 @@ is
    --  St polished: Passed when the problem solved with the bounds St
    --  holds, or with up to S.Corrections corrections of them, is
    --  certified, and St is then that answer; otherwise St is as it was.
-   --  A problem with a cone is not polished, nor one from the bounds the
+   --  A linear program is crossed over instead (Abacus.Qp.Crossover),
+   --  unless S.Pivots is zero.  A
+   --  problem with a cone is not polished, nor one from the bounds the
    --  last polish failed from.
    procedure Run
      (Pr     : Problem;

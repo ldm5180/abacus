@@ -1,0 +1,4 @@
+abacus ticked tail fixture (written by tools/make_ticked.py)
+seed 34; 164 columns, 153 scenarios, 2 parts at 0.094; outcomes on ticks of 0.005, 25012 of 25092 repeating another
+  HiGHS status 0; the exact vertex 19 free variables over 19 held rows, max |HiGHS - exact| = 2.963e-15, the furthest outside 5.093e-14
+  objective 1.007751242211e-02; columns above zero: 18

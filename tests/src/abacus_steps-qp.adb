@@ -196,7 +196,8 @@ package body Abacus_Steps.Qp is
       Solve (G, Warm => True);
    end Solve_Warm;
 
-   --  The fixtures tools/make_qp.py, make_socp.py and make_ratio.py wrote.
+   --  The fixtures tools/make_qp.py, make_socp.py, make_ratio.py and
+   --  make_ticked.py wrote.
    function Is_Fixture (Name : String) return Boolean
    is (Name
        in "spread"
@@ -205,7 +206,8 @@ package body Abacus_Steps.Qp is
         | "infeasible"
         | "nonconvex"
         | "deviation"
-        | "ratio");
+        | "ratio"
+        | "ticked");
 
    function Fixture_Name (G : Program) return String
    is (G.Fixture (1 .. G.Named));
@@ -399,7 +401,7 @@ package body Abacus_Steps.Qp is
            "a problem has 1 to"
            & Max_Variables'Image
            & " variables, or is one of the fixtures: spread, tail,"
-           & " tail_bounded, infeasible, nonconvex, deviation, ratio",
+           & " tail_bounded, infeasible, nonconvex, deviation, ratio, ticked",
          when A_Refuse_Part        =>
            "a bound or a total is a decimal number, a variable one of the"
            & " problem's, and an objective one number per variable",
