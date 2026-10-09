@@ -106,13 +106,17 @@ is
        and then I <= Work.Free_Count
        and then J <= Work.Free_Count;
 
-   --  Entry (P, R) of A A' + delta**2 I.
-   function Row_Entry (Work : Workspace; P, R : Index) return Wide
+   --  Entry (P, R) of A A' + Ridge I.
+   function Row_Entry
+     (Work : Workspace; P, R : Index; Ridge : Wide) return Wide
    is (Round_Shift (Row_Dot (Work.A, P, R, 1, Work.Free_Count))
-       + (if P = R then Delta_Squared else 0))
+       + (if P = R then Ridge else 0))
    with
      Pre =>
-       P <= Work.K and then R <= Work.K and then Work.Free_Count <= Work.N;
+       P <= Work.K
+       and then R <= Work.K
+       and then Work.Free_Count <= Work.N
+       and then Ridge in 0 .. Delta_Squared;
 
    --  A'A + delta P + delta**2 I, factored into S's leading block.
    procedure Form_S
@@ -139,7 +143,7 @@ is
    begin
       for P in 1 .. Work.Row_Count loop
          for R in 1 .. P loop
-            Store (Row_Entry (Work, P, R), Work.G (P, R), Ok);
+            Store (Row_Entry (Work, P, R, Delta_Squared), Work.G (P, R), Ok);
          end loop;
       end loop;
       Cholesky.Factor_Leading (Work.G, Work.G_D, Work.Row_Count, 1, Outcome);
@@ -602,5 +606,190 @@ is
       Unpack (Work, C, Cand);
       Settle (Pr, Work, Gr, Cand, Ok);
    end Solve;
+
+   ---------------------------------------------------------------------
+   --  The square system and its dependences.
+   ---------------------------------------------------------------------
+
+   --  How many times a square solve is refined.
+   Square_Refinements : constant := 4;
+
+   --  One refinement of Z toward A Z = V: the rows' residual solved with
+   --  A A' and brought back through A'.
+   procedure Refine_Direction
+     (Pr   : Problem;
+      Work : Workspace;
+      V    : Vector;
+      Z    : in out Vector;
+      Ok   : in out Boolean)
+   with
+     Pre =>
+       Packed (Pr, Work)
+       and then V'First = 1
+       and then V'Last = Pr.K
+       and then Z'First = 1
+       and then Z'Last = Pr.N
+   is
+      Res    : Vector (1 .. Pr.K) := [others => 0];
+      Solved : Cholesky.Solve_Result;
+   begin
+      for P in 1 .. Work.Row_Count loop
+         Store
+           (Wide (V (P))
+            - Round_Shift (Row_Vector_Dot (Work.A, P, Z, 1, Work.Free_Count)),
+            Res (P),
+            Ok);
+      end loop;
+      Cholesky.Solve_Leading (Work.G, Work.G_D, Res, Work.Row_Count, Solved);
+      Ok := Ok and then Solved = Cholesky.Solved;
+      for Q in 1 .. Work.Free_Count loop
+         exit when not Ok;
+         Store
+           (Wide (Z (Q)) + Round_Shift (Column_Vector_Dot (Work.A, Q, Res)),
+            Z (Q),
+            Ok);
+      end loop;
+   end Refine_Direction;
+
+   procedure Direction
+     (Pr   : Problem;
+      Work : Workspace;
+      V    : Vector;
+      Z    : out Vector;
+      Ok   : out Boolean) is
+   begin
+      Z := [others => 0];
+      Ok := True;
+      for K in 1 .. Square_Refinements loop
+         exit when not Ok;
+         Refine_Direction (Pr, Work, V, Z, Ok);
+      end loop;
+   end Direction;
+
+   --  One refinement of W toward A'W = C: the columns' residual brought
+   --  through A and solved with A A'.
+   procedure Refine_Prices
+     (Pr   : Problem;
+      Work : Workspace;
+      C    : Vector;
+      W    : in out Vector;
+      Ok   : in out Boolean)
+   with
+     Pre =>
+       Packed (Pr, Work)
+       and then C'First = 1
+       and then C'Last = Pr.N
+       and then W'First = 1
+       and then W'Last = Pr.K
+   is
+      Res    : Vector (1 .. Pr.N) := [others => 0];
+      Rhs    : Vector (1 .. Pr.K) := [others => 0];
+      Solved : Cholesky.Solve_Result;
+   begin
+      for Q in 1 .. Work.Free_Count loop
+         Store
+           (Wide (C (Q)) - Round_Shift (Column_Vector_Dot (Work.A, Q, W)),
+            Res (Q),
+            Ok);
+      end loop;
+      for P in 1 .. Work.Row_Count loop
+         Store
+           (Round_Shift (Row_Vector_Dot (Work.A, P, Res, 1, Work.Free_Count)),
+            Rhs (P),
+            Ok);
+      end loop;
+      Cholesky.Solve_Leading (Work.G, Work.G_D, Rhs, Work.Row_Count, Solved);
+      Ok := Ok and then Solved = Cholesky.Solved;
+      for P in 1 .. Work.Row_Count loop
+         exit when not Ok;
+         Store (Wide (W (P)) + Wide (Rhs (P)), W (P), Ok);
+      end loop;
+   end Refine_Prices;
+
+   procedure Prices
+     (Pr   : Problem;
+      Work : Workspace;
+      C    : Vector;
+      W    : out Vector;
+      Ok   : out Boolean) is
+   begin
+      W := [others => 0];
+      Ok := True;
+      for K in 1 .. Square_Refinements loop
+         exit when not Ok;
+         Refine_Prices (Pr, Work, C, W, Ok);
+      end loop;
+   end Prices;
+
+   --  A pivot under it marks a dependence: about 2**-32 of a value left
+   --  of a row's or a column's own square once the ones before it are
+   --  taken out.
+   Dependence_Floor : constant := 2**(Frac - 16);
+
+   --  A A', unregularized, factored into G's leading block with the floor;
+   --  the column it refuses at, zero when it factors.
+   procedure Row_Dependence
+     (Pr     : Problem;
+      Work   : in out Workspace;
+      At_Row : out Count;
+      Ok     : out Boolean)
+   with Pre => Packed (Pr, Work), Post => Packed (Pr, Work)
+   is
+      Outcome : Cholesky.Factor_Outcome;
+   begin
+      Ok := True;
+      for P in 1 .. Work.Row_Count loop
+         for R in 1 .. P loop
+            Store (Row_Entry (Work, P, R, 0), Work.G (P, R), Ok);
+         end loop;
+      end loop;
+      Cholesky.Factor_Leading
+        (Work.G, Work.G_D, Work.Row_Count, Dependence_Floor, Outcome);
+      Ok := Ok and then Outcome.Result /= Cholesky.Out_Of_Range;
+      At_Row :=
+        (if Outcome.Result = Cholesky.Not_Positive_Definite
+         then Outcome.Column
+         else 0);
+   end Row_Dependence;
+
+   --  A'A, unregularized, factored into S's leading block likewise.
+   procedure Column_Dependence
+     (Pr        : Problem;
+      Work      : in out Workspace;
+      At_Column : out Count;
+      Ok        : out Boolean)
+   with Pre => Packed (Pr, Work), Post => Packed (Pr, Work)
+   is
+      Outcome : Cholesky.Factor_Outcome;
+   begin
+      Ok := True;
+      for I in 1 .. Work.Free_Count loop
+         for J in 1 .. I loop
+            Store (Round_Shift (Column_Dot (Work.A, I, J)), Work.S (I, J), Ok);
+         end loop;
+      end loop;
+      Cholesky.Factor_Leading
+        (Work.S, Work.S_D, Work.Free_Count, Dependence_Floor, Outcome);
+      Ok := Ok and then Outcome.Result /= Cholesky.Out_Of_Range;
+      At_Column :=
+        (if Outcome.Result = Cholesky.Not_Positive_Definite
+         then Outcome.Column
+         else 0);
+   end Column_Dependence;
+
+   procedure Find_Dependence
+     (Pr    : Problem;
+      Work  : in out Workspace;
+      Found : out Dependence;
+      Ok    : out Boolean) is
+   begin
+      Found := (0, 0);
+      Pack (Pr, Work);
+      Form_A (Pr, Work);
+      Row_Dependence (Pr, Work, Found.Row, Ok);
+      if Ok and then Found.Row = 0 then
+         Column_Dependence (Pr, Work, Found.Column, Ok);
+      end if;
+   end Find_Dependence;
 
 end Abacus.Qp.Held;

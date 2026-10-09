@@ -66,4 +66,57 @@ is
        and then Cost'First = 1
        and then Cost'Last = Pr.N;
 
+   --  Z over the free variables, packed, solving A Z = V over the held
+   --  rows, packed: A the held rows over the free columns as the last
+   --  Solve packed them and A A' as it factored it.  Z = A'(A A')**-1 V,
+   --  refined against the exact system, so exact for a square A.  Ok is
+   --  False when a value left its range.
+   procedure Direction
+     (Pr   : Problem;
+      Work : Workspace;
+      V    : Vector;
+      Z    : out Vector;
+      Ok   : out Boolean)
+   with
+     Pre =>
+       Packed (Pr, Work)
+       and then V'First = 1
+       and then V'Last = Pr.K
+       and then Z'First = 1
+       and then Z'Last = Pr.N;
+
+   --  W over the held rows solving A'W = C over the free variables, both
+   --  packed, likewise: least squares through A A', refined.
+   procedure Prices
+     (Pr   : Problem;
+      Work : Workspace;
+      C    : Vector;
+      W    : out Vector;
+      Ok   : out Boolean)
+   with
+     Pre =>
+       Packed (Pr, Work)
+       and then C'First = 1
+       and then C'Last = Pr.N
+       and then W'First = 1
+       and then W'Last = Pr.K;
+
+   --  Where Work's held set is not a basis: the first held row, packed,
+   --  that depends on those before it over the free columns, or failing
+   --  one the first free column that depends on those before it; zero
+   --  for neither.
+   type Dependence is record
+      Row    : Count := 0;
+      Column : Count := 0;
+   end record;
+
+   --  Work's held set packed, and its dependence found through A A' and
+   --  A'A factored with a floor.  Ok is False when a value left its range.
+   procedure Find_Dependence
+     (Pr    : Problem;
+      Work  : in out Workspace;
+      Found : out Dependence;
+      Ok    : out Boolean)
+   with Pre => Fits_Work (Pr, Work), Post => Packed (Pr, Work);
+
 end Abacus.Qp.Held;
