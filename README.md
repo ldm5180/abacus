@@ -56,6 +56,7 @@ per-element rescale ADMM needs is eleven times slower.
 | `Abacus.Qp.Held` | the problem with a set of bounds held: read off an iterate, solved for a cost given, its square system both ways, its dependences, a vertex |
 | `Abacus.Qp.Polish` | the polish: the held system solved and corrected one constraint at a time |
 | `Abacus.Qp.Crossover` | a linear program walked by pivots from the held set to a certified vertex |
+| `Abacus.Qp.Picks` | the constraints a held set picks to change |
 | `Abacus.Qp.Engine` | the solver's loop, an sml machine, and `Solve` |
 | `Abacus.Random` | SplitMix64 with an explicit state, and `Below` without bias |
 | `Abacus.Sobol` | Sobol sequences in up to 64 dimensions from Joe and Kuo's direction numbers, scrambled from a seed, in Gray-code order, with `Skip` and blocks of 2**M points |
@@ -151,8 +152,9 @@ multiplier has its sign, and the dual simplex method walks to a
 feasible vertex; the shift is taken back and the primal simplex method
 -- Dantzig's rule, Bland's after a step of no length -- walks to the
 optimal one.  Each vertex is solved through its square system and the
-answer kept only when its certificate holds.  `Pivots` (200) caps a
-walk; zero falls back to the corrections.  The tail program is
+answer kept only when its certificate holds; when a crossover fails, the
+polish corrects as it would have.  `Pivots` (200) caps a walk; zero
+leaves the corrections alone.  The tail program is
 certified at 100 iterations (10 ms), within 2.9e-11 of HiGHS; the
 ticked tail program (`tests/data/qp_ticked.txt`, 318 variables, its
 outcomes on ticks, from `tools/make_ticked.py`) at 100, where the

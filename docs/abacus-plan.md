@@ -118,6 +118,7 @@ generic for that (`Abacus.Quantities`).
 | `Abacus.Qp.Scaling` | equilibration, as a step per row and variable and the scales of the matrix factored |
 | `Abacus.Qp.Held` | the problem with a set of bounds held: read off an iterate, solved for a cost given, its square system both ways, its dependences, a vertex |
 | `Abacus.Qp.Crossover` | a linear program walked by pivots from the held set to a certified vertex |
+| `Abacus.Qp.Picks` | the constraints a held set picks to change |
 
 ### 1.3 What is proved
 
@@ -1143,3 +1144,21 @@ Nothing needed an assumption or a lemma; these needed a shape:
   - **What was not done, and why:** an exact-rational pivot (no integer
     beyond 128 bits); the corrections are kept for a program with a
     quadratic term, whose answer need not be a vertex.
+- **A16, a regression and its fix (2026-10-08):** statera's repin of
+  b382aaa found a synthetic mean-CVaR program (beta 0.9, weight 2; two
+  parts of one column each, so the budgets pin both and the vertex is
+  degenerate) that certified on 79737ac and ran to the cap after: every
+  crossover gave up before its first pivot -- the basis found a budget
+  row, its column free, dependent on inequality rows held before it, and
+  could neither release it nor free a variable in it -- and the polish
+  then made no corrections.  Two fixes, each a cycle: a failed crossover
+  leaves the corrections to the polish, so it can only add to what the
+  polish certifies; and the dependence check packs the held rows
+  equalities first, so a dependence is found on an inequality, which
+  can be released.  The program is the fixture `qp_pinned.txt` (from
+  statera's synthetic view; HiGHS's vertex solved exactly as the
+  oracle).  All 1,053 roth mean-CVaR programs still certify, median 100
+  iterations, at most 1,300, 133,500 in all (140,600 before the second
+  fix); the ratio programs, the fixtures and the synthetic ticked family
+  as before.  `Abacus.Qp.Picks` took the picks out of `Held`, whose body
+  had passed a thousand lines.
