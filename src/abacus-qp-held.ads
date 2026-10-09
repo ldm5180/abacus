@@ -133,10 +133,10 @@ is
        and then W'First = 1
        and then W'Last = Pr.K;
 
-   --  Where Work's held set is not a basis: the first held row, packed,
-   --  that depends on those before it over the free columns, or failing
-   --  one the first free column that depends on those before it; zero
-   --  for neither.
+   --  Where Work's held set is not a basis: the first held row, packed
+   --  with the equalities first, that depends on those before it over the
+   --  free columns, or failing one the first free column that depends on
+   --  those before it; zero for neither.
    type Dependence is record
       Row    : Count := 0;
       Column : Count := 0;

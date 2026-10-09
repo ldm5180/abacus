@@ -853,6 +853,40 @@ is
          else 0);
    end Column_Dependence;
 
+   --  Whether held row R is to be packed in the pass that takes
+   --  equalities (First) or the one that takes the rest.
+   function In_Pass (Pr : Problem; R : Index; First : Boolean) return Boolean
+   is ((Pr.Row_Lo (R) = Pr.Row_Hi (R)) = First)
+   with Pre => R <= Pr.K;
+
+   --  Work's held rows packed again, the equalities first: a dependence is
+   --  then found on an inequality wherever one can be released.
+   procedure Pack_Equalities_First (Pr : Problem; Work : in out Workspace)
+   with Pre => Packed (Pr, Work), Post => Packed (Pr, Work)
+   is
+   begin
+      Work.Row_Count := 0;
+      for First in reverse Boolean loop
+         pragma Loop_Invariant (Work.Row_Count <= Pr.K);
+         pragma
+           Loop_Invariant
+             (for all P in 1 .. Work.Row_Count => Work.Row_At (P) <= Pr.K);
+         for R in 1 .. Pr.K loop
+            if Is_Held_Row (Work, R)
+              and then In_Pass (Pr, R, First)
+              and then Work.Row_Count < Pr.K
+            then
+               Work.Row_Count := Work.Row_Count + 1;
+               Work.Row_At (Work.Row_Count) := R;
+            end if;
+            pragma Loop_Invariant (Work.Row_Count <= Pr.K);
+            pragma
+              Loop_Invariant
+                (for all P in 1 .. Work.Row_Count => Work.Row_At (P) <= Pr.K);
+         end loop;
+      end loop;
+   end Pack_Equalities_First;
+
    procedure Find_Dependence
      (Pr    : Problem;
       Work  : in out Workspace;
@@ -861,6 +895,7 @@ is
    begin
       Found := (0, 0);
       Pack (Pr, Work);
+      Pack_Equalities_First (Pr, Work);
       Form_A (Pr, Work);
       Row_Dependence (Pr, Work, Found.Row, Ok);
       if Ok and then Found.Row = 0 then

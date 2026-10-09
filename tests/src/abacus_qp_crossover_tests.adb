@@ -5,6 +5,7 @@ with Abacus.Qp;           use Abacus.Qp;
 with Abacus.Qp.Admm;
 with Abacus.Qp.Certificate;
 with Abacus.Qp.Crossover; use Abacus.Qp.Crossover;
+with Abacus_Qp_Fixtures;
 with Abacus_Qp_Problems;  use Abacus_Qp_Problems;
 
 package body Abacus_Qp_Crossover_Tests is
@@ -46,6 +47,28 @@ package body Abacus_Qp_Crossover_Tests is
          "its certificate");
    end Test_From_Cold;
 
+   --  The pinned program from a hundred iterations: its budgets each pin
+   --  one column, and an equality row may depend on the inequality rows
+   --  held before it.  The basis keeps the equalities and lets an
+   --  inequality go, and the walk reaches the degenerate vertex.
+   procedure Test_Pinned (T : in out AUnit.Test_Cases.Test_Case'Class) is
+      pragma Unreferenced (T);
+      Iters  : constant := 100;
+      Pr     : constant Problem := Abacus_Qp_Fixtures.Load ("pinned");
+      Work   : Workspace (Pr.N, Pr.K);
+      St     : State := Cold (Pr.N, Pr.K);
+      Ok     : Boolean := True;
+      Passed : Boolean;
+   begin
+      Prepared (Pr, Work);
+      for K in 1 .. Iters loop
+         Admm.Iterate (Pr, Default_Settings, Work, St, Ok);
+      end loop;
+      Assert (Ok, "iterated");
+      Run (Pr, Default_Settings, Work, St, Passed);
+      Assert (Passed, "certified");
+   end Test_Pinned;
+
    --  A problem with a quadratic term has no vertex to cross over to: it
    --  is left as it was.
    procedure Test_Not_Linear (T : in out AUnit.Test_Cases.Test_Case'Class) is
@@ -67,6 +90,7 @@ package body Abacus_Qp_Crossover_Tests is
    begin
       Register_Routine (T, Test_From_Cold'Access, "A vertex, from cold");
       Register_Routine (T, Test_Not_Linear'Access, "No crossover for a QP");
+      Register_Routine (T, Test_Pinned'Access, "Equalities kept in a basis");
    end Register_Tests;
 
    overriding
