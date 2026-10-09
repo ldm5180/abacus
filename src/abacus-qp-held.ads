@@ -1,0 +1,69 @@
+--  The problem with a set of its bounds held: the bounds read off an
+--  iterate, and the problem solved with them held as equalities for a
+--  cost given -- each held variable at its bound, the free variables from
+--  the equality-constrained problem, the held rows' multipliers by least
+--  squares and the held variables' from the gradient.  The solves go
+--  through the Cholesky factorization of the held rows' regularized
+--  systems, refined against the exact one finer than the grid.  The
+--  polish and the crossover both work on it.
+
+package Abacus.Qp.Held
+  with SPARK_Mode
+is
+
+   --  The side a constraint at Z with multiplier Y holds in [Lo, Hi].
+   function Side_Of (Z, Y, Lo, Hi : Val) return Side
+   is (if Lo = Hi
+       then At_Lower
+       elsif Lo /= No_Lower and then Wide (Z) - Wide (Lo) < -Wide (Y)
+       then At_Lower
+       elsif Hi /= No_Upper and then Wide (Hi) - Wide (Z) < Wide (Y)
+       then At_Upper
+       else Free);
+
+   --  The bound a held side names.
+   function Bound_Of (S : Side; Lo, Hi : Val) return Val
+   is (if S = At_Upper then Hi else Lo);
+
+   --  Work's sides read off St, OSQP's rule: a bound is held when the
+   --  constraint lies nearer to it than its multiplier pulls toward it.
+   --  An equality row is always held; an open bound never, nor a cone's
+   --  row.
+   procedure Read_Held (Pr : Problem; St : State; Work : in out Workspace)
+   with Pre => Fits_Work (Pr, Work) and then Fits_State (Pr, St);
+
+   --  Whether variable I is free, and whether general row R is held.
+   function Is_Free (Work : Workspace; I : Index) return Boolean
+   is (Work.Box_Side (I) = Free)
+   with Pre => I <= Work.N;
+
+   function Is_Held_Row (Work : Workspace; R : Index) return Boolean
+   is (Work.Row_Side (R) /= Free)
+   with Pre => R <= Work.K;
+
+   --  Whether Work's maps name places of Pr.
+   function Packed (Pr : Problem; Work : Workspace) return Boolean
+   is (Fits_Work (Pr, Work)
+       and then Work.Free_Count <= Pr.N
+       and then Work.Row_Count <= Pr.K
+       and then (for all Q in 1 .. Work.Free_Count => Work.Free_At (Q) <= Pr.N)
+       and then (for all P in 1 .. Work.Row_Count => Work.Row_At (P) <= Pr.K));
+
+   --  The problem, its linear term Cost in place of Q, solved with Work's
+   --  sides held, from Cand: Cand becomes the answer and its
+   --  multipliers.  Ok is False when a value left its range or a
+   --  factorization was refused.
+   procedure Solve
+     (Pr   : Problem;
+      Cost : Vector;
+      Work : in out Workspace;
+      Cand : in out State;
+      Ok   : out Boolean)
+   with
+     Pre =>
+       Fits_Work (Pr, Work)
+       and then Fits_State (Pr, Cand)
+       and then Cost'First = 1
+       and then Cost'Last = Pr.N;
+
+end Abacus.Qp.Held;

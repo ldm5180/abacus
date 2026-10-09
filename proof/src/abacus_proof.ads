@@ -9,6 +9,7 @@ with Abacus.Qp.Admm;
 with Abacus.Qp.Certificate;
 with Abacus.Qp.Cones;
 with Abacus.Qp.Engine;
+with Abacus.Qp.Held;
 with Abacus.Qp.Polish;
 with Abacus.Qp.Scaling;
 with Abacus.Quantities;
