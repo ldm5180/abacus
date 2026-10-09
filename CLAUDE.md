@@ -30,7 +30,14 @@ comment.
   `--report-json`, rendered by multiple-cucumber-html-reporter
   (`tools/features-report`, node) into `obj/features-report/html`
 - `make prove`    — SPARK proof, `--level=2 --checks-as-errors=on`; must
-  exit 0.  Stopped after 30 minutes
+  exit 0.  Stopped after 30 minutes.  It first runs
+  `tools/phase1_guard.py`, which drops the phase-1 ALIs when a
+  `gnatprove -u` left them disagreeing on a source's checksum (the state
+  in which gnatprove's gprbuild spins forever), and holds
+  `proof/obj/.prove.lock` across the guard and gnatprove, since two
+  gnatprove runs on one tree corrupt each other; a manual `gnatprove -u`
+  takes the same lock: `flock proof/obj/.prove.lock alr exec -- gnatprove
+  -P proof/proof.gpr -u <unit> ...`
 - `make format`   — `gnatformat --check` over the committed Ada sources
   (it sees only git-tracked files: stage a new file first)
 - `make validation` — `alr build --validation`: 79 columns, `and then`
