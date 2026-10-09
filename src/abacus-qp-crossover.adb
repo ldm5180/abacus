@@ -1,6 +1,7 @@
-with Abacus.Arith;   use Abacus.Arith;
+with Abacus.Arith;    use Abacus.Arith;
 with Abacus.Qp.Cones;
-with Abacus.Qp.Held; use Abacus.Qp.Held;
+with Abacus.Qp.Picks; use Abacus.Qp.Picks;
+with Abacus.Qp.Held;  use Abacus.Qp.Held;
 with Abacus.Vectors;
 
 package body Abacus.Qp.Crossover

@@ -11,6 +11,7 @@ with Abacus.Qp.Crossover;
 with Abacus.Qp.Cones;
 with Abacus.Qp.Engine;
 with Abacus.Qp.Held;
+with Abacus.Qp.Picks;
 with Abacus.Qp.Polish;
 with Abacus.Qp.Scaling;
 with Abacus.Quantities;

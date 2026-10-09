@@ -78,26 +78,6 @@ is
        and then Cost'First = 1
        and then Cost'Last = Pr.N;
 
-   --  A constraint picked: how far it is wrong, whether it is a row,
-   --  which, and the side it is to take.
-   type Pick is record
-      Size   : Wide := 0;
-      In_Row : Boolean := False;
-      Place  : Index := Index'First;
-      To     : Side := Free;
-   end record;
-
-   --  The held bound whose multiplier pushes hardest the wrong way.
-   function Worst_Push
-     (Pr : Problem; Cand : State; Work : Workspace) return Pick
-   with Pre => Fits_Work (Pr, Work) and then Fits_State (Pr, Cand);
-
-   --  The free constraint Cand lies furthest outside, and the side it
-   --  passes.
-   function Worst_Excess
-     (Pr : Problem; Cand : State; Work : Workspace) return Pick
-   with Pre => Fits_Work (Pr, Work) and then Fits_State (Pr, Cand);
-
    --  Z over the free variables, packed, solving A Z = V over the held
    --  rows, packed: A the held rows over the free columns as the last
    --  Solve packed them and A A' as it factored it.  Z = A'(A A')**-1 V,

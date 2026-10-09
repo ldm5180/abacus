@@ -1,6 +1,7 @@
 with Abacus.Qp.Cones;
 with Abacus.Qp.Crossover;
-with Abacus.Qp.Held; use Abacus.Qp.Held;
+with Abacus.Qp.Picks; use Abacus.Qp.Picks;
+with Abacus.Qp.Held;  use Abacus.Qp.Held;
 
 package body Abacus.Qp.Polish
   with SPARK_Mode
