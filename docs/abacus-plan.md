@@ -171,8 +171,9 @@ profiles.
 median correlation is 0.7345 within a block and -0.3142 between
 (population 0.73 and -0.26), returns' mean 0.0015 (population 0.005,
 the sample's common factor pulled it down), std 0.053, min -0.35.
-The problem is PRO's: minimize (1/2) w'(20 S + 1e-6 I) w - mu'w,
-0 <= w <= 1, each block summing to 0.10, S the sample covariance.  The
+The problem is the legacy backtester's: minimize
+(1/2) w'(20 S + 1e-6 I) w - mu'w, 0 <= w <= 1, each block summing to
+0.10, S the sample covariance.  The
 oracle (OSQP, eps 1e-9, polished, 325 iterations) holds three assets;
 Clarabel agrees to within 1.2e-12 and an exact KKT solve on OSQP's
 active set to within 6e-16, with every multiplier sign right.  Returns and answers are
@@ -423,13 +424,15 @@ Nothing needed an assumption or a lemma; these needed a shape:
 ### A7 -- Sorting and quantiles
 
 - **Where:** `src/abacus-sorting.ads/.adb`.
-- **What is wrong:** PRO's quantiles are Polars' "nearest" rule,
-  its ranks break ties by an accident of string interning.
+- **What is wrong:** the legacy backtester's quantiles are Polars'
+  "nearest" rule, its ranks break ties by an accident of string
+  interning.
 - **Why:** defaults.
 - **Fix:** a proved sort (the result is sorted and is a permutation
   of the input), stable, with a caller's tie-break key; `Rank`;
-  `Quantile (Sorted, Q, Method)` with `Nearest` (PRO's rule: the
-  element at index round-half-away(q (n - 1))) and `Linear`.
+  `Quantile (Sorted, Q, Method)` with `Nearest` (the legacy
+  backtester's rule: the element at index round-half-away(q (n - 1)))
+  and `Linear`.
 - **RED first:** `stats.feature`, "The median of 1, 2, 3, 4 by the
   nearest rule is 3".
 - **Gates:** `make ci`, `make prove`.
@@ -846,7 +849,7 @@ Nothing needed an assumption or a lemma; these needed a shape:
     reached there: another reason for 40.
   - **Not tested by S0:** a bucket whose answer holds many assets (the
     oracle's holds three), caps that bind, and the semi-covariance
-    twelve of PRO's thirteen optimizers use.
+    twelve of the legacy backtester's thirteen optimizers use.
 - **Implementation (A1-A12, branch `main`, 2026-10-06):** every item
   built and committed, one cycle or more each, logged in
   `docs/tdd-log.md`.  What changed from the items as written, and why:
